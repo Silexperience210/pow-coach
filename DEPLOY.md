@@ -55,6 +55,23 @@ Cloudflare redéploie **automatiquement à chaque `git push`**, avec previews pa
 
 > Après toute modif de variables/binding : **redeploy** (Deployments → Retry).
 
+## Plafonnement strict (optionnel — Durable Object)
+
+Par défaut, les compteurs de budget vivent en **KV** (best-effort, non atomique).
+Pour un plafonnement **strict/atomique** (impossible de dépasser le budget même
+sous forte concurrence), déploie le Worker compagnon **`ledger-worker/`** puis
+binde-le au projet Pages :
+
+```bash
+cd ledger-worker && wrangler login && wrangler deploy
+```
+
+Puis Pages → **Settings → Functions → Durable Object bindings → Add** :
+variable **`LEDGER`** → Worker **`pow-coach-ledger`**, classe **`Ledger`** → **redeploy**.
+
+Dès que `LEDGER` est présent, `claim.js` passe automatiquement en mode strict
+(le repli KV ne sert plus qu'en son absence). Détails : `ledger-worker/README.md`.
+
 ## Côté LNbits
 
 - Wallet **dédié** « PoW Faucet », alimenté avec ton seul budget de récompenses.

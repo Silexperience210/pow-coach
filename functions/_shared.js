@@ -249,17 +249,96 @@ export async function payToLnAddress(env, lnaddr, amountSats, comment) {
   return { payment_hash: pd.payment_hash, bolt11: inv.pr };
 }
 
-/* ---------- budget journalier (KV) ---------- */
-export async function checkBudget(env, amount) {
-  const today = new Date().toISOString().slice(0, 10);
+/* =========================================================
+   PLAFONDS — réservation atomique
+   Deux modes :
+   • DO (binding LEDGER présent)  → plafonnement STRICT (Durable Object,
+     compteurs sérialisés, zéro course TOCTOU).
+   • KV (fallback)               → best-effort (peut légèrement se chevaucher
+     sous très fort parallélisme).
+   Interface unique : reserveBudget() renvoie { ok, error, status, rollback }.
+   ========================================================= */
+export function hasLedger(env) { return !!env.LEDGER; }
+function ledgerStub(env) { return env.LEDGER.get(env.LEDGER.idFromName("global")); }
+export async function ledgerReserve(env, payload) {
+  const r = await ledgerStub(env).fetch("https://ledger.internal/reserve", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+  });
+  return await r.json();
+}
+export async function ledgerRefund(env, decrements) {
+  await ledgerStub(env).fetch("https://ledger.internal/refund", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decrements }),
+  }).catch(() => {});
+}
+
+// construit la liste des plafonds à vérifier pour cette demande
+function buildCaps(env, session, today) {
+  const caps = [];
   const budget = parseInt(env.DAILY_BUDGET_SATS || "0", 10);
-  if (!env.FAUCET_KV || budget <= 0) return { ok: true, refund: async () => {} };
-  const key = "spent:" + today;
-  const spent = parseInt((await env.FAUCET_KV.get(key)) || "0", 10);
-  if (spent + amount > budget) return { ok: false };
-  await env.FAUCET_KV.put(key, String(spent + amount), { expirationTtl: 172800 });
-  return { ok: true, refund: async () => {
-    const s = parseInt((await env.FAUCET_KV.get(key)) || "0", 10);
-    await env.FAUCET_KV.put(key, String(Math.max(0, s - amount)), { expirationTtl: 172800 });
-  }};
+  if (budget > 0) caps.push({ key: `spent:${today}`, cap: budget, label: "budget" });
+  if (session) {
+    const uc = parseInt(env.USER_DAILY_CAP || "0", 10);
+    if (uc > 0) caps.push({ key: `uspent:${session.pubkey}:${today}`, cap: uc, label: "user" });
+  }
+  return caps;
+}
+const CAP_MSG = {
+  budget: "Budget faucet du jour épuisé — reviens demain ⚡",
+  user: "Plafond quotidien atteint — reviens demain ⚡",
+  anon: "Plafond quotidien atteint — reviens demain ⚡",
+};
+
+export async function reserveBudget(env, request, session, amount) {
+  const today = new Date().toISOString().slice(0, 10);
+  const caps = buildCaps(env, session, today);
+  let ratelimit = null;
+  if (!session) {
+    const ip = clientIp(request);
+    const anonCap = parseInt(env.ANON_DAILY_CAP || env.MAX_CLAIM_SATS || "100", 10);
+    if (anonCap > 0) caps.push({ key: `ipspent:${ip}:${today}`, cap: anonCap, label: "anon" });
+    ratelimit = { key: ip, windowSec: 60 };
+  }
+  const noop = async () => {};
+
+  // aucun store configuré → seul le plafond par retrait (déjà vérifié en amont) s'applique
+  if (!env.LEDGER && !env.FAUCET_KV) return { ok: true, rollback: noop };
+
+  // ---- mode STRICT : Durable Object ----
+  if (env.LEDGER) {
+    let r;
+    try { r = await ledgerReserve(env, { amount, ratelimit, caps }); }
+    catch { return { ok: false, status: 503, error: "Comptabilité indisponible — réessaie" }; }
+    if (!r.ok) {
+      if (r.reason === "rate") return { ok: false, status: 429, error: "Trop de demandes — patiente une minute ⚡" };
+      return { ok: false, status: 429, error: CAP_MSG[r.label] || CAP_MSG.budget };
+    }
+    return { ok: true, rollback: async () => { await ledgerRefund(env, caps.map((c) => ({ key: c.key, amount }))); } };
+  }
+
+  // ---- mode best-effort : KV ----
+  return await reserveBudgetKV(env, session, amount, today, caps, ratelimit);
+}
+
+async function reserveBudgetKV(env, session, amount, today, caps, ratelimit) {
+  const kv = env.FAUCET_KV;
+  const refunds = [];
+  const rollback = async () => { for (const f of refunds) await f(); };
+  // fréquence par IP (min TTL KV = 60 s) — non remboursée (une tentative reste une tentative)
+  if (ratelimit) {
+    const rlKey = `iprate:${ratelimit.key}`;
+    if (await kv.get(rlKey)) return { ok: false, status: 429, error: "Trop de demandes — patiente une minute ⚡" };
+    await kv.put(rlKey, "1", { expirationTtl: Math.max(60, ratelimit.windowSec || 60) });
+  }
+  for (const c of caps) {
+    const k = c.key;
+    const cur = parseInt((await kv.get(k)) || "0", 10);
+    if (cur + amount > c.cap) { await rollback(); return { ok: false, status: 429, error: CAP_MSG[c.label] || CAP_MSG.budget }; }
+    await kv.put(k, String(cur + amount), { expirationTtl: 172800 });
+    refunds.push(async () => {
+      const v = parseInt((await kv.get(k)) || "0", 10);
+      await kv.put(k, String(Math.max(0, v - amount)), { expirationTtl: 172800 });
+    });
+  }
+  return { ok: true, rollback };
 }

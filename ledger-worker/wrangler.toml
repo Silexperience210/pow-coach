@@ -1,0 +1,14 @@
+name = "pow-coach-ledger"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+workers_dev = false
+
+# La classe Durable Object exportée par ce Worker.
+[[durable_objects.bindings]]
+name = "LEDGER"
+class_name = "Ledger"
+
+# Stockage SQLite (recommandé pour les nouveaux DO) + création de la classe.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Ledger"]

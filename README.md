@@ -87,7 +87,11 @@ Puis **redeploy** (Deployments → Retry) pour appliquer variables et binding.
 | Usurpation de compte | ✔ LNURL-auth : signature secp256k1 vérifiée serveur (testée), challenge à **usage unique** |
 | Triche sur le comptage des reps | ⚠ Reste côté client. Les caps (retrait/compte/IP/jour) + **budget global** bornent la perte à ce que tu acceptes de distribuer. Validation serveur des poses = évolution future. |
 
-> ⚠ **KV n'est pas atomique** : sous un très fort parallélisme, les compteurs de budget peuvent légèrement se chevaucher. Pour un plafonnement strict, migrer vers un Durable Object ou D1. Les caps restent la borne de sécurité principale.
+> **Plafonnement strict (optionnel).** Par défaut les compteurs vivent en **KV**
+> (best-effort : sous très fort parallélisme ils peuvent légèrement se chevaucher).
+> Pour un plafonnement **atomique**, déploie le Worker **`ledger-worker/`** (Durable
+> Object) et binde-le en `LEDGER` sur le projet Pages : `claim.js` bascule alors
+> automatiquement en mode strict. Voir `ledger-worker/README.md` et `DEPLOY.md`.
 
 ### En-têtes de sécurité
 Le fichier **`_headers`** applique CSP, HSTS, `nosniff`, `Permissions-Policy: camera=(self)`, etc. Garde-le à la racine du déploiement.

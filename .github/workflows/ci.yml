@@ -17,12 +17,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: node --check on every Pages Function
+      - name: node --check on Pages Functions + Ledger Worker
         run: |
           set -e
           fail=0
-          files=$(find functions -name '*.js')
-          if [ -z "$files" ]; then echo "no functions found"; exit 1; fi
+          files=$(find functions ledger-worker/src -name '*.js')
+          if [ -z "$files" ]; then echo "no source files found"; exit 1; fi
           for f in $files; do
             echo "· $f"
             node --check "$f" || fail=1
