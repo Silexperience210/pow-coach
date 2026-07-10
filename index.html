@@ -757,6 +757,35 @@ function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
         return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count,vis:vm}};}
       if(v>o.upAt)state='up';}
     return{form,msg,dbg};}};}
+/* Pompe vue de FACE : les mains sont fixes au sol, la tête/épaules montent et
+   descendent. On mesure l'AMPLITUDE verticale épaules→mains, normalisée par la
+   largeur d'épaules (invariant échelle/distance). Auto-calibrage : on apprend
+   l'amplitude de la personne et on compte une rep quand elle descend puis remonte.
+   N'utilise QUE épaules(11,12) + poignets(15,16) → pas besoin des coudes que
+   MediaPipe perd en position basse. */
+function pushupEngine(){
+  let count=0,state='up',lastRep=0,dmin=Infinity,dmax=-Infinity,warm=0,deepest=Infinity;
+  const MIN_MS=500,need=[11,12,15,16];
+  return{type:'reps',count:()=>count,analyze(P){
+    const vm=+visMinOf(P,need).toFixed(2);
+    if(!(P[11]&&P[12]&&P[15]&&P[16])) return{form:null,msg:'frame',dbg:{vis:vm}};
+    const shY=(P[11].y+P[12].y)/2, wrY=(P[15].y+P[16].y)/2;
+    const sw=Math.hypot(P[11].x-P[12].x,P[11].y-P[12].y)||1e-3;
+    const d=(wrY-shY)/sw; // amplitude verticale normalisée
+    dmin=Math.min(dmin,d);dmax=Math.max(dmax,d);warm++;
+    const range=dmax-dmin;
+    const dbg={d:+d.toFixed(2),st:state,n:count,vis:vm,rng:+range.toFixed(2)};
+    if(warm<12||range<0.5) return{form:35,msg:'push_down',dbg}; // on apprend d'abord ton amplitude
+    const lo=dmin+range*0.40, hi=dmax-range*0.35, now=performance.now();
+    if(state==='up'){ if(d<lo){state='down';deepest=d;} }
+    else { deepest=Math.min(deepest,d);
+      if(d>hi&&now-lastRep>MIN_MS){ state='up';lastRep=now;count++;
+        const depth=(dmax-deepest)/(range||1);
+        const f=Math.round(Math.max(45,Math.min(100,depth*110+15)));
+        return{rep:true,repForm:f,form:f,msg:'push_up',dbg}; } }
+    return{form:state==='down'?75:45,msg:state==='down'?'push_up':'push_down',dbg};
+  }};
+}
 function holdEngine(o){let sec=0,last=null;
   return{type:'hold',count:()=>Math.floor(sec),analyze(P,now){
     if(!vis(P,o.need)){last=null;return{form:null,msg:'frame'};}
@@ -793,10 +822,8 @@ const SPORTS=[
      coach:(P,v,st)=>st==='down'?(v<85?'squat_depth':'squat_deeper'):'squat_down'})},
   {id:'pushup',em:'💥',unit:'reps',goal:60,
    name:{fr:'Pompes',en:'Push-ups',es:'Flexiones'},
-   tip:{fr:'Téléphone au sol, vue de profil',en:'Phone on the floor, side view',es:'Teléfono en el suelo, vista lateral'},
-   make:()=>repEngine({need:[11,12,13,14,15,16],value:elbowAngle,downAt:110,upAt:150,
-     form:(P,v)=>{const d=gs(v,85,26),l=gs(bodyLine(P),178,22);return Math.round(d*.7+l*.3);},
-     coach:(P,v,st)=>st==='down'?'push_up':'push_down'})},
+   tip:{fr:'Téléphone posé face à toi, corps tendu',en:'Phone facing you, body straight',es:'Teléfono frente a ti, cuerpo recto'},
+   make:()=>pushupEngine()},
   {id:'lunge',em:'🚶',unit:'reps',goal:60,
    name:{fr:'Fentes',en:'Lunges',es:'Zancadas'},
    tip:{fr:'De profil, alterne les jambes',en:'Side view, alternate legs',es:'De perfil, alterna las piernas'},
