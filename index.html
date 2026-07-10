@@ -731,7 +731,9 @@ function ang(a,b,c){const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};
   const dot=v1.x*v2.x+v1.y*v2.y,m=Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y);
   return m===0?180:Math.acos(Math.min(1,Math.max(-1,dot/m)))*180/Math.PI;}
 const avg=(a,b)=>(a+b)/2;
-const vis=(P,ids)=>ids.every(i=>P[i]&&(P[i].visibility===undefined||P[i].visibility>0.5));
+let VIS_MIN=0.3; // seuil de confiance des points (abaissé : MediaPipe perd les bras en position basse)
+const vis=(P,ids)=>ids.every(i=>P[i]&&(P[i].visibility===undefined||P[i].visibility>VIS_MIN));
+const visMinOf=(P,ids)=>Math.min(...ids.map(i=>P[i]?(P[i].visibility===undefined?1:P[i].visibility):0));
 const gs=(val,ideal,tol)=>Math.max(0,Math.round(100*Math.exp(-((val-ideal)**2)/(2*tol*tol))));
 const kneeAngle=P=>avg(ang(P[23],P[25],P[27]),ang(P[24],P[26],P[28]));
 const elbowAngle=P=>avg(ang(P[11],P[13],P[15]),ang(P[12],P[14],P[16]));
@@ -741,18 +743,18 @@ const hipAngle=P=>avg(ang(P[11],P[23],P[25]),ang(P[12],P[24],P[26]));
 function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
   const MIN_MS=350; // anti-rebond : pas 2 reps en moins de 350ms
   return{type:'reps',count:()=>count,analyze(P){
-    if(!vis(P,o.need))return{form:null,msg:'frame'};
+    const vm=+visMinOf(P,o.need).toFixed(2);
+    if(!vis(P,o.need))return{form:null,msg:'frame',dbg:{vis:vm}};
     // gate optionnel : bloque le comptage tant que la POSTURE n'est pas la bonne
-    // (ex. pompe : le corps doit être tendu, pas plié ni sur le flanc)
-    if(o.gate&&!o.gate(P)){state='up';reached=false;return{form:0,msg:o.gateMsg||'frame'};}
+    if(o.gate&&!o.gate(P)){state='up';reached=false;return{form:0,msg:o.gateMsg||'frame',dbg:{vis:vm}};}
     const v=o.value(P),form=o.form(P,v);let msg=o.coach(P,v,state);
     const now=performance.now();
-    const dbg={v:Math.round(v),st:state,n:count}; // calibrage
+    const dbg={v:Math.round(v),st:state,n:count,vis:vm}; // calibrage
     if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;}
     else if(state==='down'){fb=Math.max(fb,form);
       if(v<o.downAt-8)reached=true; // exige une VRAIE descente (marge sous le seuil)
       if(v>o.upAt&&reached&&now-lastRep>MIN_MS){state='up';lastRep=now;count++;
-        return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count}};}
+        return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count,vis:vm}};}
       if(v>o.upAt)state='up';}
     return{form,msg,dbg};}};}
 function holdEngine(o){let sec=0,last=null;
@@ -765,7 +767,7 @@ function holdEngine(o){let sec=0,last=null;
     return{form,msg:good?o.coach(P,form):o.badMsg};}};}
 function punchEngine(){let armed={l:true,r:true},count=0;
   return{type:'reps',count:()=>count,analyze(P){
-    if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso'};
+    if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso',dbg:{vis:+visMinOf(P,[11,12,13,14,15,16]).toFixed(2)}};
     const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
     const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null;
     const dbg={eL:Math.round(eL),eR:Math.round(eR),dyL:+(P[15].y-P[11].y).toFixed(2),dyR:+(P[16].y-P[12].y).toFixed(2),n:count}; // calibrage
