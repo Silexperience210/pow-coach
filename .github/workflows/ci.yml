@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    name: Syntax check (Functions + inline module)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: node --check on every Pages Function
+        run: |
+          set -e
+          fail=0
+          files=$(find functions -name '*.js')
+          if [ -z "$files" ]; then echo "no functions found"; exit 1; fi
+          for f in $files; do
+            echo "· $f"
+            node --check "$f" || fail=1
+          done
+          exit $fail
+
+      - name: node --check on the inline <script type="module"> in index.html
+        run: |
+          set -e
+          awk '/<script type="module">/{f=1;next} f&&/^<\/script>/{f=0} f{print}' index.html > /tmp/mod.mjs
+          test -s /tmp/mod.mjs || { echo "could not extract module script from index.html"; exit 1; }
+          node --check /tmp/mod.mjs
+          echo "index.html module script OK ($(wc -l < /tmp/mod.mjs) lines)"
+
+      - name: Guard against committed secrets
+        run: |
+          set -e
+          # échoue si une vraie clé/valeur sensible fuit dans le code versionné
+          if grep -RInE "(LNBITS_ADMIN_KEY[\"'[:space:]=]+[A-Za-z0-9]{16,})|-----BEGIN [A-Z ]*PRIVATE KEY-----|xprv[0-9a-zA-Z]{20,}" \
+               --include='*.js' --include='*.html' --include='*.md' .; then
+            echo "::error::secret-looking value committed"; exit 1
+          fi
+          echo "no committed secrets detected"
