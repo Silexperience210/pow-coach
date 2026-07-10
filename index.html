@@ -1509,8 +1509,11 @@ let nobleReady=null;
 async function loadNoble(){
   if(nobleReady)return nobleReady;
   nobleReady=(async()=>{
-    const m=await import('https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.1.0/+esm');
-    return m;
+    // @noble/curves : schnorr stable (getPublicKey/sign/verify). CSP autorise jsdelivr.
+    const m=await import('https://cdn.jsdelivr.net/npm/@noble/curves@1.8.1/secp256k1/+esm');
+    const schnorr=m.schnorr||(m.default&&m.default.schnorr);
+    const bytesToHex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+    return {schnorr,bytesToHex};
   })();
   return nobleReady;
 }
@@ -1519,12 +1522,12 @@ async function sha256hex(str){ const b=new TextEncoder().encode(str);
 async function signEvent(ev){
   const secp=await loadNoble();
   const sk=await nostrKey();
-  ev.pubkey=secp.utils.bytesToHex(secp.schnorr.getPublicKey(sk));
+  ev.pubkey=secp.bytesToHex(secp.schnorr.getPublicKey(sk));
   store.set('pownostrpub',ev.pubkey);
   const serial=JSON.stringify([0,ev.pubkey,ev.created_at,ev.kind,ev.tags,ev.content]);
   ev.id=await sha256hex(serial);
   const sig=await secp.schnorr.sign(ev.id,sk);
-  ev.sig=secp.utils.bytesToHex(sig);
+  ev.sig=secp.bytesToHex(sig);
   return ev;
 }
 window.publishScore=async()=>{
