@@ -1025,7 +1025,6 @@ window.flipCamera=async()=>{S.facing=S.facing==='user'?'environment':'user';
    idx MediaPipe : 0 nez,11/12 épaules,13/14 coudes,15/16 poignets,
    23/24 hanches,25/26 genoux,27/28 chevilles
    ========================================================= */
-const GUIDE_CONNS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
 function standPose(){ // debout de face, bras le long du corps
   return {0:[.5,.12],11:[.42,.28],12:[.58,.28],13:[.40,.45],14:[.60,.45],15:[.39,.60],16:[.61,.60],
     23:[.44,.55],24:[.56,.55],25:[.44,.75],26:[.56,.75],27:[.44,.93],28:[.56,.93]};
@@ -1049,18 +1048,63 @@ const GUIDES={
   tree:{0:[.5,.12],11:[.42,.26],12:[.58,.26],13:[.36,.14],14:[.64,.14],15:[.42,.06],16:[.58,.06],
     23:[.45,.54],24:[.55,.54],25:[.45,.74],26:[.60,.60],27:[.45,.93],28:[.52,.62]}
 };
+// sens du mouvement par exercice → schéma animé (flèche/impact/tenue)
+const EX_MOTION={squat:'v',jsquat:'v',lunge:'v',pushup:'v',knee:'v',jacks:'v',bridge:'v',
+  jab:'impact',punch2:'impact',plank:'hold',warrior:'hold',tree:'hold'};
+/* Silhouette guide "pro" : corps PLEIN lumineux (torse rempli + membres en
+   capsules épaisses + tête) au lieu d'un fil de fer, + un schéma de mouvement
+   animé. 100% vectoriel (net à tout écran, aucune image externe à héberger). */
 function drawGuide(exId,align){
   const g=GUIDES[exId]; if(!g)return;
-  const W=S.ctx.canvas.width,H=S.ctx.canvas.height,c=getComputedStyle(document.body);
-  const col=align>=0.5?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
-  S.ctx.save();
-  S.ctx.globalAlpha=0.35+0.35*Math.sin(Date.now()/380); // respiration
-  S.ctx.strokeStyle=col;S.ctx.lineWidth=10;S.ctx.lineCap='round';S.ctx.lineJoin='round';
-  S.ctx.shadowColor=col;S.ctx.shadowBlur=18;
-  GUIDE_CONNS.forEach(([a,b])=>{ if(g[a]&&g[b]){
-    S.ctx.beginPath();S.ctx.moveTo(g[a][0]*W,g[a][1]*H);S.ctx.lineTo(g[b][0]*W,g[b][1]*H);S.ctx.stroke(); }});
-  if(g[0]){ S.ctx.beginPath();S.ctx.arc(g[0][0]*W,g[0][1]*H,W*0.045,0,7);S.ctx.stroke(); }
-  S.ctx.restore();
+  const cx=S.ctx,W=cx.canvas.width,H=cx.canvas.height,c=getComputedStyle(document.body);
+  const on=align>=0.5, col=on?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
+  const P=i=>g[i]?[g[i][0]*W,g[i][1]*H]:null, sc=W/400;
+  const pulse=0.85+0.15*Math.sin(Date.now()/520); // respiration douce
+  cx.save(); cx.lineCap='round'; cx.lineJoin='round';
+  cx.shadowColor=col; cx.shadowBlur=22; cx.strokeStyle=col; cx.fillStyle=col;
+  const s1=P(11),s2=P(12),h1=P(23),h2=P(24),nose=P(0);
+  // torse rempli
+  if(s1&&s2&&h1&&h2){ cx.globalAlpha=(on?0.28:0.18)*pulse;
+    cx.beginPath();cx.moveTo(s1[0],s1[1]);cx.lineTo(s2[0],s2[1]);cx.lineTo(h2[0],h2[1]);cx.lineTo(h1[0],h1[1]);
+    cx.closePath();cx.fill(); }
+  // membres en capsules épaisses
+  cx.globalAlpha=(on?0.9:0.68)*pulse;
+  const seg=(a,b,w)=>{const A=P(a),B=P(b);if(!A||!B)return;cx.lineWidth=w*sc;cx.beginPath();cx.moveTo(A[0],A[1]);cx.lineTo(B[0],B[1]);cx.stroke();};
+  seg(11,12,20);seg(11,23,20);seg(12,24,20);seg(23,24,22);           // tronc
+  seg(11,13,17);seg(13,15,14);seg(12,14,17);seg(14,16,14);           // bras
+  seg(23,25,22);seg(25,27,17);seg(24,26,22);seg(26,28,17);           // jambes
+  // cou + tête pleine
+  if(nose&&s1&&s2){ const nk=[(s1[0]+s2[0])/2,(s1[1]+s2[1])/2];
+    cx.lineWidth=14*sc;cx.beginPath();cx.moveTo(nk[0],nk[1]);cx.lineTo(nose[0],nose[1]);cx.stroke();
+    cx.beginPath();cx.arc(nose[0],nose[1],W*0.052,0,7);cx.fill(); }
+  drawMotionHint(cx,exId,g,W,H,col,on);
+  cx.restore();
+}
+function drawMotionHint(cx,exId,g,W,H,col,on){
+  const m=EX_MOTION[exId]||'hold';
+  const xs=[],ys=[]; for(const k in g){xs.push(g[k][0]*W);ys.push(g[k][1]*H);}
+  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  const now=Date.now(),t=(now%1300)/1300;
+  cx.save(); cx.strokeStyle=col; cx.fillStyle=col; cx.shadowColor=col; cx.shadowBlur=16;
+  cx.lineCap='round'; cx.lineJoin='round'; const base=on?0.9:0.6;
+  if(m==='v'){ // flèche verticale : descends puis remonte (3 chevrons qui défilent)
+    const x=maxX+W*0.09, y0=minY+(maxY-minY)*0.12, y1=minY+(maxY-minY)*0.88, s=W*0.03;
+    cx.globalAlpha=base*0.3; cx.lineWidth=6; cx.beginPath();cx.moveTo(x,y0);cx.lineTo(x,y1);cx.stroke();
+    for(let i=0;i<3;i++){ const p=(t+i/3)%1, cy=y0+p*(y1-y0);
+      cx.globalAlpha=base*(0.4+0.6*Math.sin(p*Math.PI)); cx.lineWidth=7;
+      cx.beginPath();cx.moveTo(x-s,cy-s*0.7);cx.lineTo(x,cy);cx.lineTo(x+s,cy-s*0.7);cx.stroke(); }
+  } else if(m==='impact'){ // boxe : cible d'impact pulsante devant le buste
+    const cxp=(minX+maxX)/2, cyp=minY+(maxY-minY)*0.30, r=W*0.05*(1+0.25*Math.sin(now/220));
+    cx.globalAlpha=base*0.8; cx.lineWidth=5;
+    cx.beginPath();cx.arc(cxp,cyp,r,0,7);cx.stroke();
+    cx.globalAlpha=base*0.5; cx.beginPath();cx.arc(cxp,cyp,r*1.7,0,7);cx.stroke();
+    cx.globalAlpha=base; cx.beginPath();cx.arc(cxp,cyp,W*0.012,0,7);cx.fill();
+  } else { // tenue : anneau qui respire autour du centre
+    const cxp=(minX+maxX)/2, cyp=(minY+maxY)/2, r=Math.max(maxX-minX,maxY-minY)*0.5*(1+0.06*Math.sin(now/600));
+    cx.globalAlpha=base*0.5; cx.lineWidth=5; cx.setLineDash([W*0.03,W*0.03]);
+    cx.beginPath();cx.arc(cxp,cyp,r,0,7);cx.stroke();
+  }
+  cx.restore();
 }
 // score d'alignement (0..1) : compare la FORME de ta posture à la silhouette,
 // invariant en position ET en taille. Tu n'as donc pas à te placer pile où la
