@@ -19,7 +19,7 @@
      FAUCET_KV  (KV)              → sessions + auth + plafonds best-effort
      LEDGER     (Durable Object)  → plafonds STRICTS/atomiques (optionnel ;
                                     voir ledger-worker/). Si présent, prime sur KV. */
-import { json, preflight, originOk, lnbitsWithdrawLink, payToLnAddress, reserveBudget } from "./_shared.js";
+import { json, preflight, originOk, lnbitsWithdrawLink, payToLnAddress, reserveBudget, ledgerDebit, ledgerRefundBalance } from "./_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -46,16 +46,30 @@ export async function onRequestPost({ request, env }) {
   if (amount > maxClaim) return json({ error: `Maximum ${maxClaim} sats par retrait` }, 400, env);
 
   // ---- session / auth ----
-  const requireAuth = env.REQUIRE_AUTH === "1";
+  // Mode "solde serveur" : quand le scoring serveur est actif (LEDGER + SESSION_SECRET),
+  // les sats vivent dans le DO → la connexion est OBLIGATOIRE pour retirer, et le
+  // retrait DÉBITE le solde serveur (le montant client seul ne suffit plus).
+  const serverBalance = !!(env.LEDGER && env.SESSION_SECRET);
+  const requireAuth = env.REQUIRE_AUTH === "1" || serverBalance;
   const session = await getSession(env, body.token);
   if (requireAuth && !session) return json({ error: "auth_required" }, 401, env);
+
+  // ---- débit du solde serveur (atomique) ----
+  let balanceRefund = async () => {};
+  let newBalance;
+  if (serverBalance) {
+    const d = await ledgerDebit(env, session.pubkey, amount);
+    if (!d.ok) return json({ error: "Solde insuffisant — gagne plus de sats ⚡" }, 400, env);
+    newBalance = d.balance;
+    balanceRefund = async () => { await ledgerRefundBalance(env, session.pubkey, amount); };
+  }
 
   // ---- plafonds (budget global + cap/compte + cap/IP + fréquence) ----
   // Réservation atomique si le Durable Object LEDGER est branché (strict),
   // sinon repli KV best-effort. Voir _shared.js:reserveBudget.
   const reservation = await reserveBudget(env, request, session, amount);
-  if (!reservation.ok) return json({ error: reservation.error }, reservation.status || 429, env);
-  const rollback = reservation.rollback;
+  if (!reservation.ok) { await balanceRefund(); return json({ error: reservation.error }, reservation.status || 429, env); }
+  const rollback = async () => { await reservation.rollback(); await balanceRefund(); };
 
   // ---- paiement ----
   try {
@@ -63,10 +77,10 @@ export async function onRequestPost({ request, env }) {
       const lnaddr = String(body.lnaddress || "").trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(lnaddr)) { await rollback(); return json({ error: "Adresse Lightning invalide" }, 400, env); }
       const res = await payToLnAddress(env, lnaddr, amount, "PoW Coach reward");
-      return json({ paid: true, method: "lnaddress", amount, payment_hash: res.payment_hash }, 200, env);
+      return json({ paid: true, method: "lnaddress", amount, payment_hash: res.payment_hash, balance: newBalance }, 200, env);
     } else {
       const d = await lnbitsWithdrawLink(env, amount, "PoW Coach ⚡");
-      return json({ paid: false, method: "lnurl", amount, lnurl: d.lnurl }, 200, env);
+      return json({ paid: false, method: "lnurl", amount, lnurl: d.lnurl, balance: newBalance }, 200, env);
     }
   } catch (e) {
     await rollback();

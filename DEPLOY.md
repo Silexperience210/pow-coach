@@ -72,6 +72,31 @@ variable **`LEDGER`** → Worker **`pow-coach-ledger`**, classe **`Ledger`** →
 Dès que `LEDGER` est présent, `claim.js` passe automatiquement en mode strict
 (le repli KV ne sert plus qu'en son absence). Détails : `ledger-worker/README.md`.
 
+## Scoring serveur — sats vérifiés (optionnel)
+
+Empêche la triche triviale (`amount` forgé en devtools, rejeu) : le serveur émet
+une **séance signée** au démarrage, **recalcule** les sats à partir du journal de
+reps à la fin, et tient le **solde dans le DO**. Le montant réclamé par le client
+est ignoré.
+
+Pré-requis : le **Durable Object `LEDGER`** (ci-dessus) **+** un secret HMAC.
+
+1. Ajoute la variable **`SESSION_SECRET`** (type **Encrypt 🔒**, une valeur aléatoire
+   longue, ex. `openssl rand -hex 32`).
+2. (Optionnel) **`SERVER_DAILY_CAP`** = sats gagnables/jour/compte (défaut `200`).
+3. **Redeploy**.
+
+Dès que `LEDGER` **et** `SESSION_SECRET` sont présents :
+- `/balance` renvoie `server:true` → l'app bascule en **mode solde serveur** ;
+- **la connexion (LNURL-auth) devient nécessaire pour gagner et retirer** (le solde
+  appartient au compte, plus au navigateur) ;
+- endpoints actifs : `POST /session/start`, `POST /session/submit`, `GET /balance`.
+
+> Sans `SESSION_SECRET`, l'app reste en **mode legacy** (solde local, gains côté
+> client) — rien ne casse. ⚠ La détection de pose reste côté client : le scoring
+> serveur est une **forte mitigation**, pas une preuve. Preuve forte → build
+> native + attestation (Play Integrity), prévu en roadmap.
+
 ## Côté LNbits
 
 - Wallet **dédié** « PoW Faucet », alimenté avec ton seul budget de récompenses.
@@ -88,5 +113,6 @@ Dès que `LEDGER` est présent, `claim.js` passe automatiquement en mode strict
 - [ ] Un vrai retrait de test passe (Lightning Address **et** QR).
 - [ ] Les **en‑têtes** de `_headers` sont bien renvoyés (DevTools → Network) : CSP autorise caméra + CDN MediaPipe.
 - [ ] La caméra fonctionne en **HTTPS** (obligatoire pour `getUserMedia`).
+- [ ] Si scoring serveur activé : `GET /balance` renvoie `server:true`, et **gagner/retirer exige la connexion** (le solde est côté serveur).
 
 > 🔒 Rappel : le wallet faucet ne contient que ce que tu acceptes de distribuer. Voir `PATCH-NOTES.md` pour les garde‑fous et les limites connues (comptage reps client, KV non atomique).

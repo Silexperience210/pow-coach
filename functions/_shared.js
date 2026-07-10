@@ -260,17 +260,19 @@ export async function payToLnAddress(env, lnaddr, amountSats, comment) {
    ========================================================= */
 export function hasLedger(env) { return !!env.LEDGER; }
 function ledgerStub(env) { return env.LEDGER.get(env.LEDGER.idFromName("global")); }
-export async function ledgerReserve(env, payload) {
-  const r = await ledgerStub(env).fetch("https://ledger.internal/reserve", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+async function ledgerCall(env, path, payload) {
+  const r = await ledgerStub(env).fetch("https://ledger.internal" + path, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload || {}),
   });
   return await r.json();
 }
-export async function ledgerRefund(env, decrements) {
-  await ledgerStub(env).fetch("https://ledger.internal/refund", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decrements }),
-  }).catch(() => {});
-}
+export const ledgerReserve = (env, payload) => ledgerCall(env, "/reserve", payload);
+export const ledgerRefund = (env, decrements) => ledgerCall(env, "/refund", { decrements }).catch(() => {});
+// solde par compte (sats gagnés, vérifiés serveur)
+export const ledgerCredit = (env, p) => ledgerCall(env, "/credit", p);
+export const ledgerDebit = (env, pubkey, amount) => ledgerCall(env, "/debit", { pubkey, amount });
+export const ledgerBalance = (env, pubkey) => ledgerCall(env, "/balance", { pubkey });
+export const ledgerRefundBalance = (env, pubkey, amount) => ledgerCall(env, "/refund-balance", { pubkey, amount }).catch(() => {});
 
 // construit la liste des plafonds à vérifier pour cette demande
 function buildCaps(env, session, today) {
@@ -341,4 +343,88 @@ async function reserveBudgetKV(env, session, amount, today, caps, ratelimit) {
     });
   }
   return { ok: true, rollback };
+}
+
+/* =========================================================
+   SESSION D'ENTRAÎNEMENT — jeton signé (HMAC) + scoring serveur
+   Le serveur émet un jeton signé au démarrage (stateless), puis RECALCULE les
+   sats à partir du journal de reps envoyé à la fin. Le client ne dicte plus le
+   montant : il fournit des preuves, le serveur décide. Usage unique via le DO.
+   ========================================================= */
+const enc = (s) => new TextEncoder().encode(s);
+function b64url(bytes) {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlBytes(str) {
+  let s = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+async function hmacKey(secret) {
+  return await crypto.subtle.importKey("raw", enc(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+export async function signSession(secret, obj) {
+  const payload = b64url(enc(JSON.stringify(obj)));
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", await hmacKey(secret), enc(payload)));
+  return payload + "." + b64url(sig);
+}
+export async function verifySession(secret, token) {
+  if (typeof token !== "string" || token.indexOf(".") < 0) return null;
+  const [payload, sig] = token.split(".");
+  let ok = false;
+  try { ok = await crypto.subtle.verify("HMAC", await hmacKey(secret), b64urlBytes(sig), enc(payload)); } catch { return null; }
+  if (!ok) return null;
+  try { return JSON.parse(new TextDecoder().decode(b64urlBytes(payload))); } catch { return null; }
+}
+
+// intervalle minimal humainement plausible entre 2 reps (ms), par exercice
+const REP_MIN_MS = {
+  squat: 800, jsquat: 650, lunge: 850, knee: 550, jacks: 380,
+  pushup: 900, plank: 950, bridge: 850, crunch: 700,
+  jab: 230, punch2: 230, warrior: 950, tree: 950,
+};
+export function repMinMs(exId) { return REP_MIN_MS[exId] || 600; }
+function parseTiers(env) {
+  // "5:2,10:3,21:5" → [[5,2],[10,3],[21,5]] ; défaut = config client
+  const raw = env.COMBO_TIERS;
+  if (raw) {
+    const t = raw.split(",").map((p) => p.split(":").map((n) => parseInt(n, 10)))
+      .filter((p) => p.length === 2 && p.every(Number.isFinite));
+    if (t.length) return t;
+  }
+  return [[5, 2], [10, 3], [21, 5]];
+}
+
+/* Rejoue le journal côté serveur et calcule les sats gagnés.
+   Filtre les reps non plausibles (hors fenêtre temporelle, trop rapprochées),
+   applique le seuil de perfection + les paliers de combo. */
+export function validateRepLog(env, exId, startTs, now, reps) {
+  if (!Array.isArray(reps)) return { valid: 0, sats: 0 };
+  const PT = parseInt(env.PERFECT_THRESHOLD || "92", 10);
+  const base = parseInt(env.SATS_PERFECT || "1", 10);
+  const tiers = parseTiers(env);
+  const min = repMinMs(exId);
+  const slack = 5000;
+  const sorted = reps.slice(0, 5000)
+    .filter((r) => r && Number.isFinite(Number(r.t)))
+    .sort((a, b) => Number(a.t) - Number(b.t));
+  let combo = 0, sats = 0, valid = 0, lastT = -Infinity;
+  for (const r of sorted) {
+    const t = Number(r.t);
+    if (t < startTs - slack || t > now + slack) continue; // hors fenêtre de session
+    if (t - lastT < min) continue; // trop rapide pour être humain → ignoré
+    lastT = t; valid++;
+    const form = Math.max(0, Math.min(100, Number(r.form) || 0));
+    if (form >= PT) {
+      combo++;
+      let s = base;
+      for (const [at, v] of tiers) if (combo >= at) s = v;
+      sats += s;
+    } else {
+      combo = 0;
+    }
+  }
+  return { valid, sats };
 }

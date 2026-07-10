@@ -55,6 +55,8 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 | `USER_DAILY_CAP` | Plaintext | `200` (cap/jour par compte connecté) |
 | `ANON_DAILY_CAP` | Plaintext | `100` (cap/jour **par IP** quand non connecté ; défaut = `MAX_CLAIM_SATS`) |
 | `REQUIRE_AUTH` | Plaintext | `0` (ou `1` pour exiger la connexion) |
+| `SESSION_SECRET` | **Encrypt** 🔒 | secret HMAC des jetons de séance — active le **scoring serveur** (avec `LEDGER`) |
+| `SERVER_DAILY_CAP` | Plaintext | `200` (sats gagnables/jour/compte, scoring serveur) |
 
 ### KV (obligatoire pour l'auth + les budgets)
 
@@ -85,7 +87,8 @@ Puis **redeploy** (Deployments → Retry) pour appliquer variables et binding.
 | Facture LN Address gonflée (drain) | ✔ Le montant du bolt11 retourné est **décodé et comparé** au montant demandé avant paiement |
 | Abus anonyme (sans login) | ✔ `ANON_DAILY_CAP` par IP + fréquence mini (1 retrait / min / IP) |
 | Usurpation de compte | ✔ LNURL-auth : signature secp256k1 vérifiée serveur (testée), challenge à **usage unique** |
-| Triche sur le comptage des reps | ⚠ Reste côté client. Les caps (retrait/compte/IP/jour) + **budget global** bornent la perte à ce que tu acceptes de distribuer. Validation serveur des poses = évolution future. |
+| `amount` forgé / rejeu (devtools) | ✔ **Scoring serveur** (si activé) : séance signée HMAC à usage unique, le serveur **recalcule** les sats à partir du journal de reps et tient le **solde dans le DO** ; le montant client est ignoré |
+| Triche sur le comptage des reps | ⚠ La *détection de pose* reste côté client. Le scoring serveur filtre les logs implausibles (reps trop rapprochées, hors fenêtre) et borne l'earn/jour, mais ne **prouve** pas l'effort humain. Preuve forte = build **native + attestation** (Play Integrity), cf. roadmap. |
 
 > **Plafonnement strict (optionnel).** Par défaut les compteurs vivent en **KV**
 > (best-effort : sous très fort parallélisme ils peuvent légèrement se chevaucher).

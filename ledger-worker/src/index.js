@@ -33,6 +33,10 @@ export class Ledger {
     try { body = await request.json(); } catch { /* corps vide toléré */ }
     if (url.pathname === "/reserve") return this.reserve(body);
     if (url.pathname === "/refund") return this.refund(body);
+    if (url.pathname === "/credit") return this.credit(body);
+    if (url.pathname === "/debit") return this.debit(body);
+    if (url.pathname === "/balance") return this.balance(body);
+    if (url.pathname === "/refund-balance") return this.refundBalance(body);
     return new Response("not found", { status: 404 });
   }
 
@@ -83,7 +87,59 @@ export class Ledger {
     });
   }
 
-  // purge : compteurs de jours révolus (>3 j) et rate-limits périmés (>1 h)
+  /* ---- solde par compte (sats gagnés, vérifiés côté serveur) ----
+     bal:<pubkey> est PERSISTANT (jamais purgé). Le crédit est plafonné par le
+     cap d'earn/jour et la session (sid) est à usage unique (anti-rejeu). */
+  async credit({ sid, pubkey, amount, day, dayCap }) {
+    const amt = Math.floor(Number(amount));
+    if (!pubkey || !Number.isFinite(amt) || amt < 0) return json({ ok: false, reason: "bad" });
+    return await this.storage.transaction(async (txn) => {
+      if (sid && (await txn.get("used:" + sid))) return json({ ok: false, reason: "replay" });
+      const cap = Math.floor(Number(dayCap)) || 0;
+      let grant = amt;
+      if (cap > 0) {
+        const ek = `c:earned:${pubkey}:${day}`;
+        const earned = (await txn.get(ek)) || 0;
+        grant = Math.max(0, Math.min(amt, cap - earned));
+        if (grant > 0) await txn.put(ek, earned + grant);
+      }
+      const balKey = "bal:" + pubkey;
+      const bal = ((await txn.get(balKey)) || 0) + grant;
+      await txn.put(balKey, bal);
+      if (sid) await txn.put("used:" + sid, Date.now());
+      if (!(await this.storage.getAlarm())) await this.storage.setAlarm(Date.now() + DAY);
+      return json({ ok: true, credited: grant, balance: bal });
+    });
+  }
+
+  async debit({ pubkey, amount }) {
+    const amt = Math.floor(Number(amount));
+    if (!pubkey || !Number.isFinite(amt) || amt < 1) return json({ ok: false, reason: "bad" });
+    return await this.storage.transaction(async (txn) => {
+      const balKey = "bal:" + pubkey;
+      const bal = (await txn.get(balKey)) || 0;
+      if (amt > bal) return json({ ok: false, reason: "insufficient", balance: bal });
+      await txn.put(balKey, bal - amt);
+      return json({ ok: true, balance: bal - amt });
+    });
+  }
+
+  async refundBalance({ pubkey, amount }) {
+    const amt = Math.floor(Number(amount));
+    if (!pubkey || !Number.isFinite(amt) || amt < 1) return json({ ok: true });
+    return await this.storage.transaction(async (txn) => {
+      const balKey = "bal:" + pubkey;
+      const bal = ((await txn.get(balKey)) || 0) + amt;
+      await txn.put(balKey, bal);
+      return json({ ok: true, balance: bal });
+    });
+  }
+
+  async balance({ pubkey }) {
+    return json({ balance: (await this.storage.get("bal:" + pubkey)) || 0 });
+  }
+
+  // purge : compteurs de jours révolus (>3 j), rate-limits (>1 h), sessions (>1 j)
   async alarm() {
     const now = Date.now();
     const counters = await this.storage.list({ prefix: "c:" });
@@ -94,6 +150,10 @@ export class Ledger {
     const rates = await this.storage.list({ prefix: "rl:" });
     for (const [key, ts] of rates) {
       if (now - ts > 3600 * 1000) await this.storage.delete(key);
+    }
+    const used = await this.storage.list({ prefix: "used:" });
+    for (const [key, ts] of used) {
+      if (now - ts > DAY) await this.storage.delete(key);
     }
     await this.storage.setAlarm(now + DAY);
   }
