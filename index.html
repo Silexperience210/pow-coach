@@ -372,6 +372,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     <div class="combo-chip" id="combo-chip"></div>
     <div class="statuspill" id="statuspill"></div>
     <div class="align-meter" id="align-meter"><div class="track"><div class="fill" id="align-fill"></div></div><div class="lbl" id="align-lbl"></div></div>
+    <div id="calpanel" style="display:none;position:absolute;left:8px;top:96px;z-index:9;background:rgba(0,0,0,.8);color:#3DFFA0;font:11px/1.45 monospace;padding:8px 10px;border-radius:10px;max-width:72%;border:1px solid #3DFFA0">
+      <div style="opacity:.7;margin-bottom:4px">🔧 CALIBRAGE — bouge, puis Copier</div>
+      <div id="calvals">…</div>
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <button onclick="calCopy()" style="background:#3DFFA0;color:#000;border:none;border-radius:6px;padding:6px 10px;font:600 12px monospace">📋 Copier</button>
+        <button onclick="calClear()" style="background:#222;color:#fff;border:1px solid #444;border-radius:6px;padding:6px 10px;font:600 12px monospace">🗑</button>
+      </div>
+    </div>
     <div class="hud-top">
       <div class="exname"><span id="wk-exname"></span><small id="wk-tip"></small></div>
       <div class="ring-wrap">
@@ -622,7 +630,8 @@ const S={ lang:store.get('powlang','fr'), voice:store.get('powvoice',true),
   facing:'user', running:false, landmarker:null, ctx:null, drawer:null,
   ex:null, engine:null, combo:0, comboTier:0, sessionSats:0, lastLnurl:'', lastVoice:0,
   loginK1:'', loginTimer:null, tab:'train',
-  repLog:[], wsToken:null, serverMode:false };
+  repLog:[], wsToken:null, serverMode:false,
+  cal:(location.search.indexOf('cal=1')>=0||location.hash.indexOf('cal')>=0) };
 const L=()=>I18N[S.lang];
 const API=()=>CFG.API_BASE||''; // même origine si vide
 
@@ -738,13 +747,14 @@ function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
     if(o.gate&&!o.gate(P)){state='up';reached=false;return{form:0,msg:o.gateMsg||'frame'};}
     const v=o.value(P),form=o.form(P,v);let msg=o.coach(P,v,state);
     const now=performance.now();
+    const dbg={v:Math.round(v),st:state,n:count}; // calibrage
     if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;}
     else if(state==='down'){fb=Math.max(fb,form);
       if(v<o.downAt-8)reached=true; // exige une VRAIE descente (marge sous le seuil)
       if(v>o.upAt&&reached&&now-lastRep>MIN_MS){state='up';lastRep=now;count++;
-        return{rep:true,repForm:fb,form,msg};}
+        return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count}};}
       if(v>o.upAt)state='up';}
-    return{form,msg};}};}
+    return{form,msg,dbg};}};}
 function holdEngine(o){let sec=0,last=null;
   return{type:'hold',count:()=>Math.floor(sec),analyze(P,now){
     if(!vis(P,o.need)){last=null;return{form:null,msg:'frame'};}
@@ -758,12 +768,13 @@ function punchEngine(){let armed={l:true,r:true},count=0;
     if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso'};
     const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
     const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null;
+    const dbg={eL:Math.round(eL),eR:Math.round(eR),dyL:+(P[15].y-P[11].y).toFixed(2),dyR:+(P[16].y-P[12].y).toFixed(2),n:count}; // calibrage
     if(armed.l&&eL>140&&Math.abs(P[15].y-P[11].y)<0.33){armed.l=false;hit=eL;}
     if(armed.r&&eR>140&&Math.abs(P[16].y-P[12].y)<0.33){armed.r=false;hit=eR;}
     if(eL<130)armed.l=true;if(eR<130)armed.r=true;
     if(hit){count++;const f=gs(hit,165,25);
-      return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext'};}
-    return{form:guard,msg:'punch_guard'};}};}
+      return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext',dbg:{...dbg,n:count}};}
+    return{form:guard,msg:'punch_guard',dbg};}};}
 
 /* =========================================================
    CATALOGUE — noms/tips localisés {fr,en,es}
@@ -1002,7 +1013,7 @@ const GUIDES={
 function drawGuide(exId,align){
   const g=GUIDES[exId]; if(!g)return;
   const W=S.ctx.canvas.width,H=S.ctx.canvas.height,c=getComputedStyle(document.body);
-  const col=align>=0.6?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
+  const col=align>=0.5?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
   S.ctx.save();
   S.ctx.globalAlpha=0.35+0.35*Math.sin(Date.now()/380); // respiration
   S.ctx.strokeStyle=col;S.ctx.lineWidth=10;S.ctx.lineCap='round';S.ctx.lineJoin='round';
@@ -1017,16 +1028,15 @@ function drawGuide(exId,align){
 // silhouette est dessinée : il suffit d'adopter la bonne POSTURE, n'importe où
 // dans le cadre. Tous les points clés doivent être visibles (anti "à peine dans
 // le cadre"). La tolérance (ALIGN_TOL) est réglable.
-const ALIGN_TOL=0.62; // + petit = plus strict
+const ALIGN_TOL=0.95; // + grand = plus permissif (réglable)
 function alignScore(P,exId){
   const g=GUIDES[exId]; if(!g)return 0;
   const ids=Object.keys(g).map(Number).filter(i=>i!==0);
   const pts=[],gpts=[];
-  for(const i of ids){
-    if(!P[i]||(P[i].visibility!==undefined&&P[i].visibility<0.5))return 0; // corps entier requis
-    pts.push([P[i].x,P[i].y]);gpts.push(g[i]);
+  for(const i of ids){ // on juge la posture sur les points VISIBLES (robuste : hanches/chevilles souvent hors champ de face au sol)
+    if(P[i]&&(P[i].visibility===undefined||P[i].visibility>=0.4)){ pts.push([P[i].x,P[i].y]);gpts.push(g[i]); }
   }
-  const n=pts.length; if(!n)return 0;
+  const n=pts.length; if(n<5)return 0;
   const cen=a=>{let sx=0,sy=0;for(const p of a){sx+=p[0];sy+=p[1];}return[sx/a.length,sy/a.length];};
   const [pcx,pcy]=cen(pts),[gcx,gcy]=cen(gpts);
   const pc=pts.map(p=>[p[0]-pcx,p[1]-pcy]),gc=gpts.map(p=>[p[0]-gcx,p[1]-gcy]);
@@ -1047,6 +1057,7 @@ async function startWorkout(exId){
   if(S.serverMode && !S.token) toast(L().loginToEarn); // nudge : connexion requise pour gagner
   // respecte le choix de caméra mémorisé (défaut : frontale). Le bouton ⟳ le change.
   S.facing=store.get('powfacing', GROUND_EX.includes(exId)?'environment':'user');
+  if(S.cal){const cp=$('calpanel');if(cp)cp.style.display='block';}
   setTheme(S.ex.sport.theme);
   $('wk-exname').textContent=S.ex.name[S.lang];
   $('wk-tip').textContent=S.ex.tip[S.lang];
@@ -1085,14 +1096,15 @@ function loop(now){
 /* phase d'alignement : imiter la silhouette pour lancer le compte à rebours */
 function phaseAlign(P,now){
   const a=alignScore(P,S.ex.id);
+  if(S.cal)calRecord('align',{dbg:{align:+a.toFixed(2)},form:Math.round(a*100)});
   drawGuide(S.ex.id,a);
   drawSkeleton(P,0.55);
   const pill=$('statuspill'),meter=$('align-meter');
   // jauge d'alignement visible pendant toute la phase (sauf compte à rebours)
   meter.classList.add('show');
   $('align-fill').style.width=Math.round(a*100)+'%';
-  $('align-lbl').textContent=a>=0.6?'✓':(Math.round(a*100)+'%');
-  if(a>=0.6){
+  $('align-lbl').textContent=a>=0.5?'✓':(Math.round(a*100)+'%');
+  if(a>=0.5){
     S.alignHold=(S.alignHold||0)+1;
     if(S.alignHold===1) say(L().voice.getReady,{force:true});
     const need=16;
@@ -1133,7 +1145,30 @@ function handle(r){
   setRing(r.form);if(r.msg)coachMsg(r.msg);
   if(r.rep)onScore(r.repForm);
   if(r.tick)onScore(r.tickForm);
+  if(S.cal)calRecord('live',r);
 }
+
+/* =========================================================
+   CALIBRAGE — enregistre les mesures brutes du mouvement pour réglage précis.
+   Activé en ouvrant l'app avec ?cal=1. Un panneau montre les valeurs en direct
+   et un bouton copie tout le journal (JSON) à coller au dev pour caler les seuils.
+   ========================================================= */
+const calLog=[];
+function calRecord(ph,r){
+  const d=r.dbg||{};
+  const e={t:Date.now(),ph,ex:S.ex?S.ex.id:'',...d,form:(r.form==null?null:Math.round(r.form))};
+  if(r.rep)e.REP=1;
+  calLog.push(e); if(calLog.length>1500)calLog.shift();
+  const el=$('calvals');
+  if(el){ el.textContent=Object.entries(d).map(([k,v])=>k+':'+v).join(' ')
+    +(r.form!=null?' form:'+Math.round(r.form):'')+' ·'+calLog.length; }
+}
+window.calCopy=async()=>{
+  const payload={app:'powcoach',ex:S.ex?S.ex.id:'',facing:S.facing,n:calLog.length,log:calLog};
+  try{ await navigator.clipboard.writeText(JSON.stringify(payload)); toast('📋 '+calLog.length+' mesures copiées'); }
+  catch(e){ toast('Copie impossible'); }
+};
+window.calClear=()=>{ calLog.length=0; const el=$('calvals'); if(el)el.textContent='(vidé)'; toast('Mesures effacées'); };
 
 /* =========================================================
    FAUCET — combos, plafond, paiement
