@@ -511,7 +511,7 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   chalImgTitle:"DÉFI DE LA SEMAINE", chalImgSub:"Relève-le sur PoW Coach ⚡",
   noSats:"Aucun sat à réclamer — au boulot ! 💪", minClaim:(n)=>`Minimum ${n} sats pour réclamer`, notCfg:"⚠ Faucet non configuré par le propriétaire",
   capHit:"Plafond journalier atteint — reviens demain ⚡", err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
-  loading:"⚡ Chargement du modèle IA…", alignPose:"Mets tout ton corps dans le cadre", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
+  loading:"⚡ Chargement du modèle IA…", alignPose:"Prends la position (imite la silhouette)", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
   combo:"COMBO", comboBroken:"COMBO PERDU",
   coach:{ frame:"Place-toi entièrement dans le cadre", lost:"Personne détectée — recule un peu",
@@ -548,7 +548,7 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   chalImgTitle:"CHALLENGE OF THE WEEK", chalImgSub:"Take it on PoW Coach ⚡",
   noSats:"No sats to claim — get to work! 💪", minClaim:(n)=>`Minimum ${n} sats to claim`, notCfg:"⚠ Faucet not configured by owner",
   capHit:"Daily cap reached — come back tomorrow ⚡", err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
-  loading:"⚡ Loading AI model…", alignPose:"Get your whole body in frame", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
+  loading:"⚡ Loading AI model…", alignPose:"Get into position (match the silhouette)", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
   combo:"COMBO", comboBroken:"COMBO LOST",
   coach:{ frame:"Get fully inside the frame", lost:"No one detected — step back a bit",
@@ -585,7 +585,7 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   chalImgTitle:"RETO DE LA SEMANA", chalImgSub:"Acéptalo en PoW Coach ⚡",
   noSats:"Sin sats que reclamar — ¡a entrenar! 💪", minClaim:(n)=>`Mínimo ${n} sats para reclamar`, notCfg:"⚠ Faucet no configurado por el propietario",
   capHit:"Límite diario alcanzado — vuelve mañana ⚡", err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
-  loading:"⚡ Cargando modelo IA…", alignPose:"Pon todo tu cuerpo en el encuadre", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
+  loading:"⚡ Cargando modelo IA…", alignPose:"Ponte en posición (imita la silueta)", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
   combo:"COMBO", comboBroken:"COMBO PERDIDO",
   coach:{ frame:"Colócate por completo en el encuadre", lost:"Nadie detectado — aléjate un poco",
@@ -733,6 +733,9 @@ function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
   const MIN_MS=350; // anti-rebond : pas 2 reps en moins de 350ms
   return{type:'reps',count:()=>count,analyze(P){
     if(!vis(P,o.need))return{form:null,msg:'frame'};
+    // gate optionnel : bloque le comptage tant que la POSTURE n'est pas la bonne
+    // (ex. pompe : le corps doit être tendu, pas plié ni sur le flanc)
+    if(o.gate&&!o.gate(P)){state='up';reached=false;return{form:0,msg:o.gateMsg||'frame'};}
     const v=o.value(P),form=o.form(P,v);let msg=o.coach(P,v,state);
     const now=performance.now();
     if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;}
@@ -779,6 +782,7 @@ const SPORTS=[
    name:{fr:'Pompes',en:'Push-ups',es:'Flexiones'},
    tip:{fr:'Téléphone au sol, vue de profil',en:'Phone on the floor, side view',es:'Teléfono en el suelo, vista lateral'},
    make:()=>repEngine({need:[11,12,13,14,15,16,23,24,27,28],value:elbowAngle,downAt:95,upAt:155,
+     gate:P=>bodyLine(P)>140, gateMsg:'push_line', // corps tendu requis (anti "sur le flanc")
      form:(P,v)=>{const d=gs(v,80,20),l=gs(bodyLine(P),178,14);return Math.round(d*.55+l*.45);},
      coach:(P,v,st)=>bodyLine(P)<160?'push_line':(st==='down'?'push_up':'push_down')})},
   {id:'lunge',em:'🚶',unit:'reps',goal:60,
@@ -963,6 +967,7 @@ async function startCamera(){
   v.style.transform=mir;c.style.transform=mir;
 }
 window.flipCamera=async()=>{S.facing=S.facing==='user'?'environment':'user';
+  store.set('powfacing',S.facing); // mémorise ton choix de caméra
   try{await startCamera();}catch(e){toast(L().camFail.split('\n')[0]);}};
 
 /* =========================================================
@@ -1008,18 +1013,29 @@ function drawGuide(exId,align){
   if(g[0]){ S.ctx.beginPath();S.ctx.arc(g[0][0]*W,g[0][1]*H,W*0.045,0,7);S.ctx.stroke(); }
   S.ctx.restore();
 }
-// score d'alignement (0..1) entre pose détectée et guide
-// "readiness" du démarrage : on ne force PLUS à coller pixel par pixel à la
-// silhouette (trop dur, positions absolues). On démarre dès que le corps est
-// suffisamment VISIBLE dans le cadre. La silhouette reste un simple repère,
-// et le comptage des reps (avec le score de forme) fait le vrai travail ensuite.
+// score d'alignement (0..1) : compare la FORME de ta posture à la silhouette,
+// invariant en position ET en taille. Tu n'as donc pas à te placer pile où la
+// silhouette est dessinée : il suffit d'adopter la bonne POSTURE, n'importe où
+// dans le cadre. Tous les points clés doivent être visibles (anti "à peine dans
+// le cadre"). La tolérance (ALIGN_TOL) est réglable.
+const ALIGN_TOL=0.62; // + petit = plus strict
 function alignScore(P,exId){
   const g=GUIDES[exId]; if(!g)return 0;
   const ids=Object.keys(g).map(Number).filter(i=>i!==0);
-  if(!ids.length)return 0;
-  let vis=0;
-  for(const i of ids){ if(P[i]&&(P[i].visibility===undefined||P[i].visibility>=0.5)) vis++; }
-  return vis/ids.length;
+  const pts=[],gpts=[];
+  for(const i of ids){
+    if(!P[i]||(P[i].visibility!==undefined&&P[i].visibility<0.5))return 0; // corps entier requis
+    pts.push([P[i].x,P[i].y]);gpts.push(g[i]);
+  }
+  const n=pts.length; if(!n)return 0;
+  const cen=a=>{let sx=0,sy=0;for(const p of a){sx+=p[0];sy+=p[1];}return[sx/a.length,sy/a.length];};
+  const [pcx,pcy]=cen(pts),[gcx,gcy]=cen(gpts);
+  const pc=pts.map(p=>[p[0]-pcx,p[1]-pcy]),gc=gpts.map(p=>[p[0]-gcx,p[1]-gcy]);
+  const rms=a=>{let s=0;for(const p of a)s+=p[0]*p[0]+p[1]*p[1];return Math.sqrt(s/a.length)||1e-6;};
+  const ps=rms(pc),gs2=rms(gc);
+  let sum=0;
+  for(let i=0;i<n;i++){const dx=pc[i][0]/ps-gc[i][0]/gs2,dy=pc[i][1]/ps-gc[i][1]/gs2;sum+=Math.hypot(dx,dy);}
+  return Math.max(0,Math.min(1,1-(sum/n)/ALIGN_TOL));
 }
 
 let lastVideoTime=-1,smoothForm=0;
@@ -1030,7 +1046,8 @@ async function startWorkout(exId){
   S.phase='align';S.countdown=0;smoothLM=null;S.alignHold=0;S.cdStarted=false;
   startServerSession(exId); // ouvre la séance notée serveur (si connecté + serverMode)
   if(S.serverMode && !S.token) toast(L().loginToEarn); // nudge : connexion requise pour gagner
-  S.facing=GROUND_EX.includes(exId)?'environment':'user'; // arrière pour le sol
+  // respecte le choix de caméra mémorisé (défaut : frontale). Le bouton ⟳ le change.
+  S.facing=store.get('powfacing', GROUND_EX.includes(exId)?'environment':'user');
   setTheme(S.ex.sport.theme);
   $('wk-exname').textContent=S.ex.name[S.lang];
   $('wk-tip').textContent=S.ex.tip[S.lang];
