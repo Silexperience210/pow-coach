@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0C">
+<title>PoW Coach — Proof of Workout ⚡</title>
+
+<!-- ╔══════════════════════════════════════════════════════════════════╗
+     ║  ⚙ CONFIGURATION PROPRIÉTAIRE — À ÉDITER AVANT DÉPLOIEMENT       ║
+     ║                                                                    ║
+     ║  🔒 AUCUNE CLÉ ICI. L'admin key LNbits vit dans un Secret chiffré  ║
+     ║  Cloudflare Pages (functions/), jamais dans l'app.                 ║
+     ║  Laisse API_BASE:"" pour appeler les Functions du même domaine.    ║
+     ║  Voir README.md pour le déploiement.                               ║
+     ╚══════════════════════════════════════════════════════════════════╝ -->
+<script>
+window.POW_CONFIG = Object.freeze({
+  // Laisse "" pour utiliser le même domaine que l'app (recommandé sur Cloudflare Pages).
+  // Sinon mets l'origine de tes Functions, ex: "https://coachsats.pages.dev"
+  API_BASE: "",
+  REQUIRE_AUTH: false,         // true = connexion LNURL-auth obligatoire pour gagner/retirer
+  SATS_PERFECT: 1,             // sats par geste parfait
+  COMBO_TIERS: [               // paliers de combo (gestes parfaits consécutifs)
+    { at: 5,  sats: 2 },       // à partir de x5 : 2 sats / geste parfait
+    { at: 10, sats: 3 },
+    { at: 21, sats: 5 }
+  ],
+  SATS_WEEKLY_GOAL: 21,        // bonus quand un objectif hebdo est atteint
+  PERFECT_THRESHOLD: 92,       // % de forme minimum pour "parfait"
+  DAILY_CAP_SATS: 100,         // plafond de sats gagnables / jour / appareil (côté client)
+  MIN_CLAIM_SATS: 10,          // solde minimum pour retirer
+  MAX_CLAIM_SATS: 100          // max par retrait — DOIT refléter MAX_CLAIM_SATS côté serveur
+});
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0A0A0C; --panel:#141419; --panel2:#1C1C24; --line:#2A2A35;
+  --acc:#FF6B00; --acc2:#FFB86B; --hot:#FF2244; --grn:#3DFFA0;
+  --txt:#EDEDF2; --dim:#8A8A99;
+  --glow:0 0 12px color-mix(in srgb,var(--acc) 55%,transparent), 0 0 34px color-mix(in srgb,var(--acc) 22%,transparent);
+}
+/* ---- thèmes par discipline ---- */
+body[data-theme="muscu"]  {--acc:#FF6B00;--acc2:#FFB86B;--hot:#FF2244}
+body[data-theme="gainage"]{--acc:#00D4FF;--acc2:#8FE9FF;--hot:#2E6BFF}
+body[data-theme="yoga"]   {--acc:#A78BFA;--acc2:#D6C7FF;--hot:#F472B6}
+body[data-theme="pilates"]{--acc:#FF4FA3;--acc2:#FFA8D2;--hot:#B4008C}
+body[data-theme="street"] {--acc:#B8FF29;--acc2:#E2FF9B;--hot:#3DFFA0}
+body[data-theme="boxe"]   {--acc:#FF2244;--acc2:#FF8DA0;--hot:#FF6B00}
+body[data-theme="thai"]   {--acc:#FFC531;--acc2:#FFE39B;--hot:#FF7A00}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif;font-size:17px;overflow-x:hidden;
+  transition:--acc .3s}
+h1,h2,h3,.disp{font-family:'Chakra Petch',monospace;letter-spacing:.04em;text-transform:uppercase}
+button{font-family:'Chakra Petch',monospace;cursor:pointer;border:none;background:none;color:inherit}
+
+/* scanlines + halo ambiant */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.014) 2px 4px)}
+.aurora{position:fixed;top:-30dvh;left:50%;transform:translateX(-50%);width:140vw;height:60dvh;z-index:0;
+  background:radial-gradient(ellipse at center,color-mix(in srgb,var(--acc) 16%,transparent),transparent 68%);
+  pointer-events:none;transition:background .6s;filter:blur(10px)}
+
+.screen{display:none;min-height:100dvh;padding:16px 16px calc(20px + env(safe-area-inset-bottom));position:relative;z-index:1}
+.screen.active{display:block}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px}
+.brand{font-family:'Chakra Petch',monospace;font-weight:700;font-size:18px;letter-spacing:.06em;white-space:nowrap}
+.brand b{color:var(--acc)}
+.iconbtn{min-width:42px;height:42px;border-radius:10px;background:var(--panel);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--acc2);padding:0 10px}
+.iconbtn:active{background:var(--panel2)}
+.iconbtn.off{opacity:.45}
+
+.chip{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 14%,#111),var(--panel));
+  border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);border-radius:999px;padding:7px 14px;
+  font-family:'Chakra Petch',monospace;font-weight:600}
+.chip .zap{color:var(--acc);text-shadow:var(--glow)}
+.chip.bump{animation:bump .45s ease}
+@keyframes bump{35%{transform:scale(1.14)}}
+
+/* sport cards, chacune porte l'accent de son thème */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 14px;position:relative;
+  overflow:hidden;text-align:left;transition:transform .12s}
+.card:active{transform:scale(.97);border-color:var(--c)}
+.card .em{font-size:30px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--c) 60%,transparent))}
+.card h3{font-size:14px;margin-bottom:3px}
+.card p{color:var(--dim);font-size:12.5px;line-height:1.25}
+.card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--c)}
+.card::after{content:"";position:absolute;top:-40%;right:-30%;width:80%;height:80%;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--c) 13%,transparent),transparent 70%)}
+
+.exrow{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:14px;margin-bottom:10px;width:100%;text-align:left}
+.exrow:active{border-color:var(--acc)}
+.exrow .em{font-size:28px}
+.exrow .meta{flex:1}
+.exrow .meta h3{font-size:15px}
+.exrow .meta p{color:var(--dim);font-size:13px}
+.exrow .go{color:var(--acc);font-size:20px}
+
+.goal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px}
+.goal .row{display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;gap:8px}
+.goal .row b{font-family:'Chakra Petch',monospace;white-space:nowrap}
+.bar{height:9px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--hot),var(--acc),var(--acc2));
+  border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.goal.done{border-color:var(--grn)}
+.goal.done .row b{color:var(--grn)}
+
+/* ---------- workout ---------- */
+#screen-workout{padding:0}
+.cam-wrap{position:relative;width:100%;height:100dvh;background:#000;overflow:hidden}
+#video,#overlay{position:absolute;inset:0;width:100%;height:100%}
+#video{object-fit:cover}
+.hud-top{position:absolute;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 34px;
+  display:flex;justify-content:space-between;align-items:flex-start;z-index:10;
+  background:linear-gradient(180deg,rgba(10,10,12,.85),transparent)}
+.hud-bottom{position:absolute;bottom:0;left:0;right:0;padding:26px 16px calc(16px + env(safe-area-inset-bottom));
+  z-index:10;background:linear-gradient(0deg,rgba(10,10,12,.92),transparent)}
+.exname{font-family:'Chakra Petch',monospace;font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.06em;max-width:60%}
+.exname small{display:block;color:var(--acc2);font-size:11px;font-weight:500;margin-top:2px;text-transform:none;letter-spacing:0}
+
+.counter{display:flex;align-items:baseline;gap:12px;justify-content:center;margin-bottom:2px}
+.counter .num{font-family:'Chakra Petch',monospace;font-weight:700;font-size:62px;line-height:1;color:#fff;
+  text-shadow:0 0 18px color-mix(in srgb,var(--acc) 65%,transparent)}
+.counter .lbl{color:var(--dim);font-size:14px;text-transform:uppercase;font-family:'Chakra Petch',monospace}
+.session-sats{text-align:center;font-family:'Chakra Petch',monospace;font-size:14px;color:var(--acc2);margin-bottom:6px;min-height:18px}
+
+.ring-wrap{position:relative;width:74px;height:74px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(255,255,255,.12);stroke-width:6}
+.ring-fg{fill:none;stroke:var(--acc);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .25s,stroke .25s}
+.ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Chakra Petch',monospace;font-weight:700;font-size:17px}
+.ring-val small{font-size:8px;color:var(--dim);font-weight:500;letter-spacing:.08em}
+
+/* combo */
+.combo{position:absolute;left:0;right:0;top:22%;z-index:14;text-align:center;pointer-events:none;
+  font-family:'Chakra Petch',monospace;font-weight:700;opacity:0;transform:scale(.6)}
+.combo.show{animation:comboA .9s cubic-bezier(.2,1.4,.3,1) forwards}
+@keyframes comboA{0%{opacity:0;transform:scale(.5) rotate(-4deg)}30%{opacity:1;transform:scale(1.2) rotate(2deg)}
+  55%{transform:scale(1)}100%{opacity:0;transform:scale(1.05) translateY(-24px)}}
+.combo .x{font-size:52px;color:var(--acc);text-shadow:0 0 24px var(--acc),0 0 60px color-mix(in srgb,var(--acc) 60%,transparent)}
+.combo .t{font-size:15px;letter-spacing:.35em;color:#fff}
+.combo-chip{position:absolute;top:calc(96px + env(safe-area-inset-top));right:14px;z-index:11;
+  font-family:'Chakra Petch',monospace;font-weight:700;font-size:13px;color:var(--acc);
+  background:rgba(10,10,12,.7);border:1px solid var(--acc);border-radius:999px;padding:5px 12px;display:none}
+.combo-chip.show{display:block;animation:bump .3s ease}
+.combo-chip.broken{border-color:var(--hot);color:var(--hot);animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+
+.coachmsg{text-align:center;min-height:24px;font-size:16px;font-weight:600;color:var(--acc2);margin-bottom:10px}
+.wk-actions{display:flex;gap:10px}
+.wk-actions button{flex:1;padding:14px;border-radius:12px;font-weight:700;font-size:13px;letter-spacing:.05em;text-transform:uppercase}
+.btn-stop{background:var(--panel);border:1px solid var(--hot);color:var(--hot)}
+.btn-acc{background:linear-gradient(135deg,var(--acc),var(--hot));color:#0A0A0C;box-shadow:var(--glow)}
+.btn-ghost{background:var(--panel);border:1px solid var(--line);color:var(--txt)}
+
+.satpop{position:absolute;z-index:20;font-family:'Chakra Petch',monospace;font-weight:700;pointer-events:none;
+  color:var(--acc2);text-shadow:0 0 14px var(--acc);animation:pop 1.5s ease-out forwards;white-space:nowrap}
+.satpop.perfect{color:var(--grn);text-shadow:0 0 16px rgba(61,255,160,.9)}
+@keyframes pop{0%{transform:translateY(0) scale(.6);opacity:0}12%{opacity:1;transform:translateY(-14px) scale(1.15)}
+  30%{transform:translateY(-30px) scale(1)}100%{transform:translateY(-130px) scale(1);opacity:0}}
+.flash{position:absolute;inset:0;z-index:15;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(61,255,160,.26),transparent 65%)}
+.flash.on{animation:flashA .55s ease-out}
+@keyframes flashA{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+
+.statuspill{position:absolute;top:calc(78px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:16;
+  background:rgba(10,10,12,.92);border:1px solid var(--acc);border-radius:12px;padding:12px 20px;
+  font-family:'Chakra Petch',monospace;font-size:14px;text-align:center;display:none;max-width:80%;line-height:1.4;
+  box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.statuspill.show{display:block}
+.statuspill.big{top:50%;transform:translate(-50%,-50%);font-size:100px;padding:6px 44px;border-width:2px;
+  background:rgba(10,10,12,.7);animation:cdpop .8s ease-out}
+@keyframes cdpop{0%{transform:translate(-50%,-50%) scale(1.6);opacity:0}20%{opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+/* jauge d'alignement */
+.align-meter{position:absolute;bottom:calc(150px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  z-index:16;width:64%;max-width:280px;display:none}
+.align-meter.show{display:block}
+.align-meter .track{height:8px;background:rgba(10,10,12,.7);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.align-meter .fill{height:100%;width:0;background:linear-gradient(90deg,var(--hot),var(--acc),var(--grn));
+  border-radius:99px;transition:width .12s}
+.align-meter .lbl{text-align:center;font-family:'Chakra Petch',monospace;font-size:11px;color:var(--acc2);
+  margin-top:5px;letter-spacing:.08em;text-transform:uppercase}
+
+/* ---------- modals ---------- */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(5,5,8,.86);display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.modal.show{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line);border-bottom:none;border-radius:20px 20px 0 0;
+  width:100%;max-width:520px;padding:22px 18px calc(24px + env(safe-area-inset-bottom));max-height:88dvh;overflow-y:auto}
+.sheet h2{font-size:17px;margin-bottom:14px;color:var(--acc2)}
+.hint{font-size:13.5px;color:var(--dim);line-height:1.45;margin:10px 0}
+.sheet .wk-actions{margin-top:16px}
+#qrbox{background:#fff;border-radius:14px;padding:14px;width:fit-content;margin:14px auto;box-shadow:var(--glow)}
+.reward-title{text-align:center;font-family:'Chakra Petch',monospace;font-weight:700;font-size:24px;color:var(--grn);
+  text-shadow:0 0 16px rgba(61,255,160,.6);margin-bottom:4px}
+.reward-sub{text-align:center;color:var(--dim);font-size:14px}
+.langrow{display:flex;gap:8px;margin:8px 0 4px}
+.langrow button{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:14px;font-weight:600}
+.langrow button.sel{border-color:var(--acc);color:var(--acc);box-shadow:var(--glow)}
+.method-tabs{display:flex;gap:8px;margin:14px 0 12px}
+.method-tabs button{flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+  font-family:'Chakra Petch',monospace;font-size:12.5px;font-weight:600;letter-spacing:.03em}
+.method-tabs button.sel{border-color:var(--acc);color:var(--acc);box-shadow:var(--glow)}
+.field{margin:10px 0}
+.field label{display:block;font-size:12px;color:var(--dim);text-transform:uppercase;font-family:'Chakra Petch',monospace;
+  letter-spacing:.06em;margin-bottom:6px}
+.field input{width:100%;padding:13px 14px;border-radius:11px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--txt);font-size:16px;font-family:'Rajdhani',sans-serif}
+.field input:focus{outline:none;border-color:var(--acc);box-shadow:var(--glow)}
+.acc-id{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:12px;padding:12px;margin-bottom:12px}
+.acc-id span{font-size:26px;filter:drop-shadow(0 0 8px var(--acc))}
+.acc-id b{font-family:'Chakra Petch',monospace;font-size:15px;display:block}
+.acc-id small{color:var(--dim);font-size:11px;word-break:break-all;font-family:monospace}
+
+.toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--acc);border-radius:12px;padding:11px 18px;z-index:60;
+  font-size:14px;display:none;max-width:88%;text-align:center}
+.toast.show{display:block;animation:toastA 3.2s forwards}
+@keyframes toastA{0%{opacity:0;transform:translate(-50%,10px)}10%,85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
+
+.section-title{font-size:13px;color:var(--dim);text-transform:uppercase;font-family:'Chakra Petch',monospace;
+  letter-spacing:.08em;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:"";flex:1;height:1px;background:var(--line)}
+/* nav tabs */
+.navtabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px}
+.navtab{flex:1;padding:9px 4px;border-radius:8px;font-family:'Chakra Petch',monospace;font-size:12px;font-weight:600;
+  color:var(--dim);letter-spacing:.02em}
+.navtab.sel{background:var(--panel2);color:var(--acc);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 40%,transparent)}
+/* stats */
+.stat-hero{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:8px;position:relative;overflow:hidden}
+.stat-hero::after{content:"";position:absolute;top:-50%;right:-20%;width:70%;height:120%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--acc) 12%,transparent),transparent 70%)}
+.stat-big{text-align:center;margin-bottom:14px}
+.stat-big b{display:block;font-family:'Chakra Petch',monospace;font-size:46px;line-height:1;color:var(--acc);
+  text-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent)}
+.stat-big span{color:var(--dim);font-size:13px;text-transform:uppercase;font-family:'Chakra Petch',monospace;letter-spacing:.08em}
+.stat-row{display:flex;gap:10px}
+.stat-cell{flex:1;background:var(--panel2);border-radius:12px;padding:12px 8px;text-align:center}
+.stat-cell b{display:block;font-family:'Chakra Petch',monospace;font-size:22px;color:var(--txt)}
+.stat-cell span{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+.chartcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.disc-bar{margin-bottom:10px}
+.disc-bar .l{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.disc-bar .l b{font-family:'Chakra Petch',monospace}
+/* board */
+.board-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.board-head .hint{flex:1;margin:0}
+.board-refresh{padding:9px 12px;border-radius:10px;font-size:12px;white-space:nowrap}
+.board-row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:12px;margin-bottom:8px}
+.board-row .rank{font-family:'Chakra Petch',monospace;font-weight:700;font-size:18px;width:32px;text-align:center;color:var(--dim)}
+.board-row.top1 .rank{color:#FFD23F}.board-row.top2 .rank{color:#C0C0C0}.board-row.top3 .rank{color:#CD7F32}
+.board-row.me{border-color:var(--acc);box-shadow:var(--glow)}
+.board-row .who{flex:1}.board-row .who b{font-family:'Chakra Petch',monospace;font-size:14px}
+.board-row .who small{display:block;color:var(--dim);font-size:11px;font-family:monospace}
+.board-row .score{font-family:'Chakra Petch',monospace;font-weight:700;color:var(--acc)}
+.board-publish{width:100%;padding:14px;border-radius:12px;font-weight:700;margin-top:6px}
+/* challenge */
+.chal-builder{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.chal-builder select{width:100%;padding:13px 14px;border-radius:11px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--txt);font-size:16px;font-family:'Rajdhani',sans-serif}
+.chal-builder .btn-acc{width:100%;padding:14px;border-radius:12px;font-weight:700;margin-top:6px}
+.chal-card{background:var(--panel);border:1px solid var(--acc);border-radius:14px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden}
+.chal-card h3{font-size:16px;margin-bottom:6px}
+.chal-card .chal-prog{color:var(--dim);font-size:13px;margin-bottom:10px}
+.chal-card .chal-actions{display:flex;gap:8px;margin-top:12px}
+.chal-card .chal-actions button{flex:1;padding:11px;border-radius:10px;font-weight:600;font-size:12.5px}
+.faucet-info{display:flex;gap:10px;margin:14px 0 4px}
+.faucet-info .box{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.faucet-info .box b{display:block;font-family:'Chakra Petch',monospace;font-size:17px;color:var(--acc)}
+.faucet-info .box span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body data-theme="muscu">
+<div class="aurora"></div>
+
+<!-- ============ HOME ============ -->
+<div class="screen active" id="screen-home">
+  <div class="topbar">
+    <div class="brand">PoW<b>·</b>COACH<b>⚡</b></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="chip" id="chip-balance" onclick="openClaim()"><span class="zap">⚡</span><span id="balance-val">0</span></button>
+      <button class="iconbtn" id="btn-account" onclick="openAccount()">👤</button>
+      <button class="iconbtn" id="btn-voice" onclick="toggleVoice()">🔊</button>
+      <button class="iconbtn" id="btn-lang" onclick="openLang()">FR</button>
+    </div>
+  </div>
+  <p style="color:var(--dim);font-size:14px;margin-bottom:10px" id="home-sub"></p>
+  <div class="navtabs">
+    <button class="navtab sel" data-tab="train" onclick="setTab('train')" id="nt-train"></button>
+    <button class="navtab" data-tab="stats" onclick="setTab('stats')" id="nt-stats"></button>
+    <button class="navtab" data-tab="board" onclick="setTab('board')" id="nt-board"></button>
+    <button class="navtab" data-tab="challenge" onclick="setTab('challenge')" id="nt-challenge"></button>
+  </div>
+
+  <div class="tabview" id="tab-train">
+    <div class="faucet-info">
+      <div class="box"><b id="fi-perfect">+1</b><span id="fi-perfect-l"></span></div>
+      <div class="box"><b id="fi-combo">x5</b><span id="fi-combo-l"></span></div>
+      <div class="box"><b id="fi-goal">+21</b><span id="fi-goal-l"></span></div>
+    </div>
+    <div class="section-title" id="st-sports"></div>
+    <div class="grid" id="sports-grid"></div>
+    <div class="section-title" id="st-goals"></div>
+    <div id="goals-list"></div>
+  </div>
+
+  <div class="tabview" id="tab-stats" style="display:none">
+    <div class="stat-hero">
+      <div class="stat-big"><b id="stat-reps">0</b><span id="stat-reps-l"></span></div>
+      <div class="stat-row">
+        <div class="stat-cell"><b id="stat-streak">0</b><span id="stat-streak-l"></span></div>
+        <div class="stat-cell"><b id="stat-sats">0</b><span id="stat-sats-l"></span></div>
+        <div class="stat-cell"><b id="stat-perfect">0</b><span id="stat-perfect-l"></span></div>
+      </div>
+    </div>
+    <div class="section-title" id="st-week7"></div>
+    <div class="chartcard"><canvas id="chart7" height="150"></canvas></div>
+    <div class="section-title" id="st-bydisc"></div>
+    <div id="disc-bars"></div>
+  </div>
+
+  <div class="tabview" id="tab-board" style="display:none">
+    <div class="board-head">
+      <p class="hint" id="board-intro"></p>
+      <button class="btn-ghost board-refresh" id="board-refresh" onclick="loadBoard(true)"></button>
+    </div>
+    <div id="board-list"></div>
+    <button class="btn-acc board-publish" id="board-publish" onclick="publishScore()"></button>
+  </div>
+
+  <div class="tabview" id="tab-challenge" style="display:none">
+    <div id="challenge-active"></div>
+    <div class="section-title" id="st-newchallenge"></div>
+    <div class="chal-builder">
+      <div class="field"><label id="chal-ex-label"></label><select id="chal-ex"></select></div>
+      <div class="field"><label id="chal-target-label"></label><input id="chal-target" type="number" min="10" value="100"></div>
+      <button class="btn-acc" id="chal-create" onclick="createChallenge()"></button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ SPORT ============ -->
+<div class="screen" id="screen-sport">
+  <div class="topbar">
+    <button class="iconbtn" onclick="goHome()">←</button>
+    <div class="brand" id="sport-title"></div>
+    <div style="width:42px"></div>
+  </div>
+  <div id="exercise-list"></div>
+</div>
+
+<!-- ============ WORKOUT ============ -->
+<div class="screen" id="screen-workout">
+  <div class="cam-wrap">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="flash" id="flash"></div>
+    <div class="combo" id="combo"><div class="x" id="combo-x"></div><div class="t" id="combo-t"></div></div>
+    <div class="combo-chip" id="combo-chip"></div>
+    <div class="statuspill" id="statuspill"></div>
+    <div class="align-meter" id="align-meter"><div class="track"><div class="fill" id="align-fill"></div></div><div class="lbl" id="align-lbl"></div></div>
+    <div class="hud-top">
+      <div class="exname"><span id="wk-exname"></span><small id="wk-tip"></small></div>
+      <div class="ring-wrap">
+        <svg width="74" height="74"><circle class="ring-bg" cx="37" cy="37" r="31"/><circle class="ring-fg" id="ring" cx="37" cy="37" r="31" stroke-dasharray="194.8" stroke-dashoffset="194.8"/></svg>
+        <div class="ring-val"><span id="ring-num">—</span><small id="ring-lbl"></small></div>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div class="counter"><span class="num" id="wk-count">0</span><span class="lbl" id="wk-unit"></span></div>
+      <div class="session-sats" id="session-sats"></div>
+      <div class="coachmsg" id="coachmsg"></div>
+      <div class="wk-actions">
+        <button class="btn-stop" id="btn-stop" onclick="stopWorkout()"></button>
+        <button class="btn-ghost" id="btn-cam" onclick="flipCamera()"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LANG ============ -->
+<div class="modal" id="modal-lang">
+  <div class="sheet">
+    <h2 id="lang-title"></h2>
+    <div class="langrow">
+      <button onclick="setLang('fr')" id="lb-fr">🇫🇷 Français</button>
+      <button onclick="setLang('en')" id="lb-en">🇬🇧 English</button>
+      <button onclick="setLang('es')" id="lb-es">🇪🇸 Español</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PRE-CLAIM ============ -->
+<div class="modal" id="modal-preclaim">
+  <div class="sheet">
+    <h2 id="pc-title"></h2>
+    <p class="hint" id="pc-text"></p>
+    <div class="method-tabs">
+      <button id="mt-lnaddr" class="sel" onclick="setMethod('lnaddress')"></button>
+      <button id="mt-lnurl" onclick="setMethod('lnurl')"></button>
+    </div>
+    <div id="lnaddr-field" class="field">
+      <label id="lnaddr-label"></label>
+      <input id="lnaddr-input" type="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ton@wallet.com">
+      <p class="hint" id="lnaddr-hint"></p>
+    </div>
+    <div id="lnurl-note" class="hint" style="display:none"></div>
+    <div class="wk-actions">
+      <button class="btn-ghost" onclick="closeModal('modal-preclaim')" id="pc-later"></button>
+      <button class="btn-acc" id="btn-doclaim" onclick="doClaim()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CLAIM RESULT ============ -->
+<div class="modal" id="modal-claim">
+  <div class="sheet">
+    <div class="reward-title" id="claim-title"></div>
+    <p class="reward-sub" id="claim-sub"></p>
+    <div id="qrbox"></div>
+    <div class="wk-actions" id="claim-actions">
+      <button class="btn-ghost" onclick="copyLnurl()" id="claim-copy"></button>
+      <button class="btn-acc" onclick="closeModal('modal-claim')" id="claim-close"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ACCOUNT ============ -->
+<div class="modal" id="modal-account">
+  <div class="sheet">
+    <h2 id="acc-title"></h2>
+    <div id="acc-logged-out">
+      <p class="hint" id="acc-out-text"></p>
+      <div class="wk-actions">
+        <button class="btn-ghost" onclick="closeModal('modal-account')" id="acc-close1"></button>
+        <button class="btn-acc" onclick="startLogin()" id="acc-login-btn"></button>
+      </div>
+    </div>
+    <div id="acc-logged-in" style="display:none">
+      <div class="acc-id"><span id="acc-avatar">⚡</span><div><b id="acc-pubkey"></b><small id="acc-pubkey-full"></small></div></div>
+      <div class="field">
+        <label id="acc-lnaddr-label"></label>
+        <input id="acc-lnaddr" type="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ton@wallet.com">
+      </div>
+      <div class="wk-actions">
+        <button class="btn-ghost" onclick="logout()" id="acc-logout"></button>
+        <button class="btn-acc" onclick="saveAccount()" id="acc-save"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOGIN (LNURL-auth) ============ -->
+<div class="modal" id="modal-login">
+  <div class="sheet">
+    <h2 id="login-title"></h2>
+    <p class="reward-sub" id="login-sub"></p>
+    <div id="login-qrbox"></div>
+    <p class="hint" id="login-status"></p>
+    <div class="wk-actions">
+      <button class="btn-ghost" onclick="cancelLogin()" id="login-cancel"></button>
+      <button class="btn-acc" onclick="copyLoginLnurl()" id="login-copy"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* =========================================================
+   PoW Coach v2 — Faucet Edition ⚡ (Silexperience)
+   ========================================================= */
+import { PoseLandmarker, FilesetResolver, DrawingUtils } from
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const CFG = window.POW_CONFIG;
+
+/* ---------- i18n ---------- */
+const I18N = {
+fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes gestes en direct.",
+  sports:"Disciplines", goals:"Objectifs de la semaine", perfectL:"sat / geste parfait", comboL:"combos boostés", goalL:"sats / objectif",
+  reps:"reps", sec:"sec", hits:"coups", week:"cette semaine", form:"FORME", stop:"■ Terminer", cam:"⟳ Caméra",
+  langTitle:"🌐 Langue du coach", later:"Plus tard", createW:"Créer le retrait", creating:"Création…",
+  pcTitle:"⚡ Réclamer tes sats", pcText:(n)=>`Solde gagné : <b style="color:var(--acc2)">${n} sats</b>. Choisis comment recevoir :`,
+  claimSub:"Scanne avec n'importe quel wallet Lightning", copy:"Copier LNURL", close:"Fermer", copied:"LNURL copié ✔", copyFail:"Copie impossible",
+  account:"👤 Mon compte", accOutText:"Connecte-toi avec ton wallet Lightning (LNURL-auth) pour sauvegarder ta progression et retirer tes sats sur plusieurs appareils. Aucun email, aucun mot de passe — juste ta signature.", accLogin:"Se connecter", accLoggedTitle:"👤 Mon compte", accLnaddrLabel:"Adresse Lightning (pour recevoir)", accLogout:"Déconnexion", accSave:"Enregistrer", saved:"Enregistré ✔", loginTitle:"⚡ Connexion Lightning", loginSub:"Scanne avec ton wallet compatible LNURL-auth (Phoenix, Zeus, Breez…)", loginWaiting:"En attente de la signature du wallet…", loginOk:"Connecté ✔", loginExpired:"Challenge expiré, réessaie", loginCancel:"Annuler", cancel:"Annuler", close:"Fermer", mLnaddr:"⚡ Adresse Lightning", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Ton adresse Lightning", lnaddrHint:"Paiement automatique et instantané vers cette adresse (ex : nom@walletofsatoshi.com).", lnurlNote:"Un bon de retrait LNURL sera généré : scanne le QR avec n'importe quel wallet.", payDo:"Recevoir", paidOk:(n)=>`⚡ ${n} sats envoyés !`, paidSub:"Vérifie ton wallet Lightning", authRequired:"Connecte-toi d'abord pour retirer", noLnaddr:"Entre ton adresse Lightning",
+  tabTrain:"🏋️ Entraîner", tabStats:"📊 Stats", tabBoard:"🏆 Classement", tabChallenge:"🎯 Défis",
+  statReps:"reps au total", statStreak:"jours de suite", statSats:"sats gagnés", statPerfect:"parfaits",
+  week7:"7 derniers jours", byDisc:"Par discipline", noStats:"Entraîne-toi pour voir tes stats apparaître 💪",
+  boardIntro:"Classement mondial par reps totales, via Nostr. Publie ton score pour y figurer.",
+  boardRefresh:"↻ Rafraîchir", boardLoading:"Chargement du classement…", boardEmpty:"Sois le premier à publier ton score ⚡",
+  publish:"📡 Publier mon score", publishing:"Publication…", published:(n)=>`Publié sur ${n} relays ✔`, pubFail:"Aucun relay n'a répondu",
+  askNick:"Ton pseudo pour le classement :",
+  newChallenge:"Nouveau défi", chalEx:"Exercice", chalTarget:"Objectif (reps)", chalCreate:"Créer le défi", chalAny:"🔥 Toutes disciplines",
+  noChallenge:"Aucun défi en cours. Crée-en un et partage-le !", chalCreated:"Défi créé 🎯", chalShare:"Partager", chalImported:"Défi importé 🎯",
+  chalShareText:(t,e)=>`Je te défie : ${t} ${e} cette semaine sur PoW Coach ⚡`,
+  chalImgTitle:"DÉFI DE LA SEMAINE", chalImgSub:"Relève-le sur PoW Coach ⚡",
+  noSats:"Aucun sat à réclamer — au boulot ! 💪", minClaim:(n)=>`Minimum ${n} sats pour réclamer`, notCfg:"⚠ Faucet non configuré par le propriétaire",
+  capHit:"Plafond journalier atteint — reviens demain ⚡", err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
+  loading:"⚡ Chargement du modèle IA…", alignPose:"Imite la silhouette pour démarrer", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
+  goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
+  combo:"COMBO", comboBroken:"COMBO PERDU",
+  coach:{ frame:"Place-toi entièrement dans le cadre", lost:"Personne détectée — recule un peu",
+    squat_down:"Descends, dos droit", squat_deeper:"Descends encore un peu", squat_depth:"Profondeur parfaite 💪",
+    push_line:"Gaine ! Corps bien aligné", push_up:"Pousse fort !", push_down:"Descends poitrine au sol",
+    lunge_up:"Genou à 90°, remonte", lunge_step:"Grand pas en avant",
+    plank_hold:"Alignement parfait, tiens bon 🔥", plank_fix:"Serre les abdos, hanches alignées", plank_bad:"Hanches trop hautes ou trop basses",
+    warrior_hold:"Posture de guerrier 🙏", warrior_fix:"Bras à l'horizontale, genou avant fléchi", warrior_bad:"Fléchis le genou avant, tends les bras",
+    tree_hold:"Racines solides 🌳", tree_fix:"Monte le pied, hanches de niveau", tree_bad:"Lève un pied contre la jambe opposée",
+    bridge_up:"Monte les hanches, serre les fessiers", bridge_down:"Redescends lentement",
+    jacks:"Bras au ciel, jambes écartées, rythme !", jsq_up:"Explose vers le haut ! 🚀", jsq_down:"Descends et saute",
+    punch_full:"Extension complète 🔥", punch_ext:"Allonge davantage le bras", punch_guard:"Garde haute, frappe sec et ramène",
+    knee_hit:"Genou puissant ! Hanche engagée", knee_up:"Monte le genou au-dessus de la hanche",
+    torso:"Buste et bras visibles face caméra" },
+  voice:{ start:"C'est parti !", getReady:"Prépare-toi", perfect:"Parfait !", combo:(n)=>`Combo ${n} !`, comboBroken:"Combo perdu",
+    goal:"Objectif de la semaine atteint ! Félicitations !", milestone:(n,u)=>`${n} ${u==='sec'?'secondes':u==='coups'?'coups':'répétitions'}`, cap:"Plafond du jour atteint" } },
+en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your form live.",
+  sports:"Disciplines", goals:"This week's goals", perfectL:"sat / perfect rep", comboL:"boosted combos", goalL:"sats / goal",
+  reps:"reps", sec:"sec", hits:"hits", week:"this week", form:"FORM", stop:"■ Finish", cam:"⟳ Camera",
+  langTitle:"🌐 Coach language", later:"Later", createW:"Create withdrawal", creating:"Creating…",
+  pcTitle:"⚡ Claim your sats", pcText:(n)=>`Earned balance: <b style="color:var(--acc2)">${n} sats</b>. Choose how to receive:`,
+  claimSub:"Scan with any Lightning wallet", copy:"Copy LNURL", close:"Close", copied:"LNURL copied ✔", copyFail:"Copy failed",
+  account:"👤 My account", accOutText:"Sign in with your Lightning wallet (LNURL-auth) to save your progress and withdraw across devices. No email, no password — just your signature.", accLogin:"Sign in", accLoggedTitle:"👤 My account", accLnaddrLabel:"Lightning Address (to receive)", accLogout:"Log out", accSave:"Save", saved:"Saved ✔", loginTitle:"⚡ Lightning login", loginSub:"Scan with your LNURL-auth wallet (Phoenix, Zeus, Breez…)", loginWaiting:"Waiting for wallet signature…", loginOk:"Connected ✔", loginExpired:"Challenge expired, try again", loginCancel:"Cancel", cancel:"Cancel", close:"Close", mLnaddr:"⚡ Lightning Address", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Your Lightning Address", lnaddrHint:"Automatic instant payment to this address (e.g. name@walletofsatoshi.com).", lnurlNote:"An LNURL withdrawal voucher will be generated: scan the QR with any wallet.", payDo:"Receive", paidOk:(n)=>`⚡ ${n} sats sent!`, paidSub:"Check your Lightning wallet", authRequired:"Sign in first to withdraw", noLnaddr:"Enter your Lightning Address",
+  tabTrain:"🏋️ Train", tabStats:"📊 Stats", tabBoard:"🏆 Ranking", tabChallenge:"🎯 Challenges",
+  statReps:"total reps", statStreak:"day streak", statSats:"sats earned", statPerfect:"perfect",
+  week7:"Last 7 days", byDisc:"By discipline", noStats:"Train to see your stats appear 💪",
+  boardIntro:"Global ranking by total reps, via Nostr. Publish your score to appear.",
+  boardRefresh:"↻ Refresh", boardLoading:"Loading ranking…", boardEmpty:"Be the first to publish your score ⚡",
+  publish:"📡 Publish my score", publishing:"Publishing…", published:(n)=>`Published to ${n} relays ✔`, pubFail:"No relay responded",
+  askNick:"Your nickname for the ranking:",
+  newChallenge:"New challenge", chalEx:"Exercise", chalTarget:"Target (reps)", chalCreate:"Create challenge", chalAny:"🔥 All disciplines",
+  noChallenge:"No active challenge. Create one and share it!", chalCreated:"Challenge created 🎯", chalShare:"Share", chalImported:"Challenge imported 🎯",
+  chalShareText:(t,e)=>`I challenge you: ${t} ${e} this week on PoW Coach ⚡`,
+  chalImgTitle:"CHALLENGE OF THE WEEK", chalImgSub:"Take it on PoW Coach ⚡",
+  noSats:"No sats to claim — get to work! 💪", minClaim:(n)=>`Minimum ${n} sats to claim`, notCfg:"⚠ Faucet not configured by owner",
+  capHit:"Daily cap reached — come back tomorrow ⚡", err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
+  loading:"⚡ Loading AI model…", alignPose:"Match the silhouette to start", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
+  goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
+  combo:"COMBO", comboBroken:"COMBO LOST",
+  coach:{ frame:"Get fully inside the frame", lost:"No one detected — step back a bit",
+    squat_down:"Go down, back straight", squat_deeper:"Go a little deeper", squat_depth:"Perfect depth 💪",
+    push_line:"Core tight! Keep your body aligned", push_up:"Push hard!", push_down:"Chest down to the floor",
+    lunge_up:"Knee at 90°, come back up", lunge_step:"Big step forward",
+    plank_hold:"Perfect alignment, hold it 🔥", plank_fix:"Squeeze your core, align your hips", plank_bad:"Hips too high or too low",
+    warrior_hold:"Warrior stance 🙏", warrior_fix:"Arms level, front knee bent", warrior_bad:"Bend the front knee, extend your arms",
+    tree_hold:"Solid roots 🌳", tree_fix:"Raise your foot, level your hips", tree_bad:"Lift one foot against the opposite leg",
+    bridge_up:"Lift your hips, squeeze the glutes", bridge_down:"Lower back down slowly",
+    jacks:"Arms up, legs wide, keep the rhythm!", jsq_up:"Explode upward! 🚀", jsq_down:"Squat down and jump",
+    punch_full:"Full extension 🔥", punch_ext:"Extend the arm further", punch_guard:"Guard up, snap and retract",
+    knee_hit:"Powerful knee! Drive the hip", knee_up:"Raise the knee above your hip",
+    torso:"Torso and arms visible, face the camera" },
+  voice:{ start:"Let's go!", getReady:"Get ready", perfect:"Perfect!", combo:(n)=>`Combo ${n}!`, comboBroken:"Combo lost",
+    goal:"Weekly goal reached! Congratulations!", milestone:(n,u)=>`${n} ${u==='sec'?'seconds':u==='hits'?'hits':'reps'}`, cap:"Daily cap reached" } },
+es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos en vivo.",
+  sports:"Disciplinas", goals:"Objetivos de la semana", perfectL:"sat / gesto perfecto", comboL:"combos mejorados", goalL:"sats / objetivo",
+  reps:"reps", sec:"seg", hits:"golpes", week:"esta semana", form:"FORMA", stop:"■ Terminar", cam:"⟳ Cámara",
+  langTitle:"🌐 Idioma del coach", later:"Más tarde", createW:"Crear retiro", creating:"Creando…",
+  pcTitle:"⚡ Reclama tus sats", pcText:(n)=>`Saldo ganado: <b style="color:var(--acc2)">${n} sats</b>. Elige cómo recibir:`,
+  claimSub:"Escanea con cualquier wallet Lightning", copy:"Copiar LNURL", close:"Cerrar", copied:"LNURL copiado ✔", copyFail:"No se pudo copiar",
+  account:"👤 Mi cuenta", accOutText:"Inicia sesión con tu wallet Lightning (LNURL-auth) para guardar tu progreso y retirar en varios dispositivos. Sin email, sin contraseña — solo tu firma.", accLogin:"Iniciar sesión", accLoggedTitle:"👤 Mi cuenta", accLnaddrLabel:"Dirección Lightning (para recibir)", accLogout:"Cerrar sesión", accSave:"Guardar", saved:"Guardado ✔", loginTitle:"⚡ Acceso Lightning", loginSub:"Escanea con tu wallet LNURL-auth (Phoenix, Zeus, Breez…)", loginWaiting:"Esperando la firma del wallet…", loginOk:"Conectado ✔", loginExpired:"Challenge expirado, reintenta", loginCancel:"Cancelar", cancel:"Cancelar", close:"Cerrar", mLnaddr:"⚡ Dirección Lightning", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Tu dirección Lightning", lnaddrHint:"Pago automático e instantáneo a esta dirección (ej: nombre@walletofsatoshi.com).", lnurlNote:"Se generará un vale de retiro LNURL: escanea el QR con cualquier wallet.", payDo:"Recibir", paidOk:(n)=>`⚡ ¡${n} sats enviados!`, paidSub:"Revisa tu wallet Lightning", authRequired:"Inicia sesión para retirar", noLnaddr:"Introduce tu dirección Lightning",
+  tabTrain:"🏋️ Entrenar", tabStats:"📊 Stats", tabBoard:"🏆 Ranking", tabChallenge:"🎯 Retos",
+  statReps:"reps totales", statStreak:"días seguidos", statSats:"sats ganados", statPerfect:"perfectos",
+  week7:"Últimos 7 días", byDisc:"Por disciplina", noStats:"Entrena para ver tus stats 💪",
+  boardIntro:"Ranking mundial por reps totales, vía Nostr. Publica tu puntuación para aparecer.",
+  boardRefresh:"↻ Actualizar", boardLoading:"Cargando ranking…", boardEmpty:"Sé el primero en publicar tu puntuación ⚡",
+  publish:"📡 Publicar mi puntuación", publishing:"Publicando…", published:(n)=>`Publicado en ${n} relays ✔`, pubFail:"Ningún relay respondió",
+  askNick:"Tu apodo para el ranking:",
+  newChallenge:"Nuevo reto", chalEx:"Ejercicio", chalTarget:"Objetivo (reps)", chalCreate:"Crear reto", chalAny:"🔥 Todas las disciplinas",
+  noChallenge:"Sin retos activos. ¡Crea uno y compártelo!", chalCreated:"Reto creado 🎯", chalShare:"Compartir", chalImported:"Reto importado 🎯",
+  chalShareText:(t,e)=>`Te reto: ${t} ${e} esta semana en PoW Coach ⚡`,
+  chalImgTitle:"RETO DE LA SEMANA", chalImgSub:"Acéptalo en PoW Coach ⚡",
+  noSats:"Sin sats que reclamar — ¡a entrenar! 💪", minClaim:(n)=>`Mínimo ${n} sats para reclamar`, notCfg:"⚠ Faucet no configurado por el propietario",
+  capHit:"Límite diario alcanzado — vuelve mañana ⚡", err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
+  loading:"⚡ Cargando modelo IA…", alignPose:"Imita la silueta para empezar", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
+  goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
+  combo:"COMBO", comboBroken:"COMBO PERDIDO",
+  coach:{ frame:"Colócate por completo en el encuadre", lost:"Nadie detectado — aléjate un poco",
+    squat_down:"Baja, espalda recta", squat_deeper:"Baja un poco más", squat_depth:"Profundidad perfecta 💪",
+    push_line:"¡Aprieta el core! Cuerpo alineado", push_up:"¡Empuja fuerte!", push_down:"Pecho hacia el suelo",
+    lunge_up:"Rodilla a 90°, sube", lunge_step:"Gran paso adelante",
+    plank_hold:"Alineación perfecta, aguanta 🔥", plank_fix:"Aprieta el abdomen, caderas alineadas", plank_bad:"Caderas muy altas o muy bajas",
+    warrior_hold:"Postura de guerrero 🙏", warrior_fix:"Brazos horizontales, rodilla delantera flexionada", warrior_bad:"Flexiona la rodilla delantera, extiende los brazos",
+    tree_hold:"Raíces firmes 🌳", tree_fix:"Sube el pie, caderas niveladas", tree_bad:"Apoya un pie contra la pierna opuesta",
+    bridge_up:"Sube las caderas, aprieta glúteos", bridge_down:"Baja lentamente",
+    jacks:"¡Brazos arriba, piernas abiertas, ritmo!", jsq_up:"¡Explota hacia arriba! 🚀", jsq_down:"Baja y salta",
+    punch_full:"Extensión completa 🔥", punch_ext:"Extiende más el brazo", punch_guard:"Guardia alta, golpea y retrae",
+    knee_hit:"¡Rodillazo potente! Empuja la cadera", knee_up:"Sube la rodilla por encima de la cadera",
+    torso:"Torso y brazos visibles frente a la cámara" },
+  voice:{ start:"¡Vamos!", getReady:"Prepárate", perfect:"¡Perfecto!", combo:(n)=>`¡Combo ${n}!`, comboBroken:"Combo perdido",
+    goal:"¡Objetivo semanal logrado! ¡Felicidades!", milestone:(n,u)=>`${n} ${u==='sec'?'segundos':u==='hits'?'golpes':'repeticiones'}`, cap:"Límite diario alcanzado" } }
+};
+const VOICE_LANG = { fr:'fr-FR', en:'en-US', es:'es-ES' };
+
+/* ---------- persistance ---------- */
+const mem={};
+const store={ get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v);}catch(e){return k in mem?mem[k]:d;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){mem[k]=v;}} };
+
+/* ---------- état ---------- */
+const S={ lang:store.get('powlang','fr'), voice:store.get('powvoice',true),
+  balance:store.get('powbalance',0), week:store.get('powweek',null), claimed:store.get('powclaimed',{}),
+  day:store.get('powday',null), // {date, earned}
+  token:store.get('powtoken',''), pubkey:store.get('powpubkey',''), lnaddr:store.get('powlnaddr',''),
+  method:store.get('powmethod','lnaddress'),
+  stats:store.get('powstats',null), // {totalReps, totalPerfect, totalSats, streak, lastDay, byDisc:{}, hist:{}}
+  challenges:store.get('powchallenges',[]), // défis actifs
+  nick:store.get('pownick',''),
+  facing:'user', running:false, landmarker:null, ctx:null, drawer:null,
+  ex:null, engine:null, combo:0, comboTier:0, sessionSats:0, lastLnurl:'', lastVoice:0,
+  loginK1:'', loginTimer:null, tab:'train' };
+const L=()=>I18N[S.lang];
+const API=()=>CFG.API_BASE||''; // même origine si vide
+const DEFAULT_RELAYS=['wss://relay.damus.io','wss://nos.lol','wss://relay.primal.net','wss://nostr.bitcoiner.social'];
+
+/* ---------- stats à vie ---------- */
+function ensureStats(){
+  if(!S.stats) S.stats={totalReps:0,totalPerfect:0,totalSats:0,streak:0,lastDay:'',byDisc:{},hist:{}};
+  return S.stats;
+}
+function bumpStat(discId,perfect,sats){
+  const st=ensureStats(),today=new Date().toISOString().slice(0,10);
+  st.totalReps++; if(perfect)st.totalPerfect++; st.totalSats+=sats||0;
+  st.byDisc[discId]=(st.byDisc[discId]||0)+1;
+  st.hist[today]=(st.hist[today]||0)+1;
+  // streak : jours consécutifs avec ≥1 rep
+  if(st.lastDay!==today){
+    const y=new Date(Date.now()-864e5).toISOString().slice(0,10);
+    st.streak = st.lastDay===y ? st.streak+1 : 1;
+    st.lastDay=today;
+  }
+  store.set('powstats',st);
+}
+
+/* ---------- voix du coach ---------- */
+let voices=[];
+function loadVoices(){ voices=speechSynthesis.getVoices(); }
+if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function say(text,{force=false}={}){
+  if(!S.voice || !('speechSynthesis' in window) || !text) return;
+  const now=Date.now();
+  if(!force && now-S.lastVoice<1400) return;  // anti-spam
+  S.lastVoice=now;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text.replace(/[⚡🔥💪🙏🌳🚀]/g,''));
+  u.lang=VOICE_LANG[S.lang]; u.rate=1.08; u.pitch=1.0; u.volume=1;
+  const v=voices.find(v=>v.lang===u.lang)||voices.find(v=>v.lang.startsWith(S.lang));
+  if(v) u.voice=v;
+  speechSynthesis.speak(u);
+}
+window.toggleVoice=()=>{ S.voice=!S.voice; store.set('powvoice',S.voice);
+  document.getElementById('btn-voice').classList.toggle('off',!S.voice);
+  document.getElementById('btn-voice').textContent=S.voice?'🔊':'🔇';
+  if(S.voice) say(L().voice.start,{force:true}); else speechSynthesis.cancel(); };
+
+/* ---------- semaine ISO + plafond journalier ---------- */
+function weekId(){const d=new Date();const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return t.getUTCFullYear()+'-W'+Math.ceil((((t-y0)/864e5)+1)/7);}
+function ensureWeek(){const id=weekId();
+  if(!S.week||S.week.id!==id){S.week={id,progress:{}};S.claimed={};persist();}}
+function ensureDay(){const d=new Date().toISOString().slice(0,10);
+  if(!S.day||S.day.date!==d){S.day={date:d,earned:0};store.set('powday',S.day);}}
+function persist(){store.set('powweek',S.week);store.set('powclaimed',S.claimed);
+  store.set('powbalance',S.balance);store.set('powday',S.day);}
+function capLeft(){ensureDay();return Math.max(0,CFG.DAILY_CAP_SATS-S.day.earned);}
+
+/* =========================================================
+   GÉOMÉTRIE & MOTEURS (messages = clés i18n)
+   ========================================================= */
+function ang(a,b,c){const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};
+  const dot=v1.x*v2.x+v1.y*v2.y,m=Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y);
+  return m===0?180:Math.acos(Math.min(1,Math.max(-1,dot/m)))*180/Math.PI;}
+const avg=(a,b)=>(a+b)/2;
+const vis=(P,ids)=>ids.every(i=>P[i]&&(P[i].visibility===undefined||P[i].visibility>0.5));
+const gs=(val,ideal,tol)=>Math.max(0,Math.round(100*Math.exp(-((val-ideal)**2)/(2*tol*tol))));
+const kneeAngle=P=>avg(ang(P[23],P[25],P[27]),ang(P[24],P[26],P[28]));
+const elbowAngle=P=>avg(ang(P[11],P[13],P[15]),ang(P[12],P[14],P[16]));
+const bodyLine=P=>avg(ang(P[11],P[23],P[27]),ang(P[12],P[24],P[28]));
+const hipAngle=P=>avg(ang(P[11],P[23],P[25]),ang(P[12],P[24],P[26]));
+
+function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
+  const MIN_MS=350; // anti-rebond : pas 2 reps en moins de 350ms
+  return{type:'reps',count:()=>count,analyze(P){
+    if(!vis(P,o.need))return{form:null,msg:'frame'};
+    const v=o.value(P),form=o.form(P,v);let msg=o.coach(P,v,state);
+    const now=performance.now();
+    if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;}
+    else if(state==='down'){fb=Math.max(fb,form);
+      if(v<o.downAt-8)reached=true; // exige une VRAIE descente (marge sous le seuil)
+      if(v>o.upAt&&reached&&now-lastRep>MIN_MS){state='up';lastRep=now;count++;
+        return{rep:true,repForm:fb,form,msg};}
+      if(v>o.upAt)state='up';}
+    return{form,msg};}};}
+function holdEngine(o){let sec=0,last=null;
+  return{type:'hold',count:()=>Math.floor(sec),analyze(P,now){
+    if(!vis(P,o.need)){last=null;return{form:null,msg:'frame'};}
+    const form=o.form(P),good=form>=55;
+    if(good){if(last!==null){const prev=Math.floor(sec);sec+=(now-last)/1000;
+        if(Math.floor(sec)>prev)return{tick:true,tickForm:form,form,msg:o.coach(P,form)};}
+      last=now;}else last=null;
+    return{form,msg:good?o.coach(P,form):o.badMsg};}};}
+function punchEngine(){let armed={l:true,r:true},count=0;
+  return{type:'reps',count:()=>count,analyze(P){
+    if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso'};
+    const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
+    const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null;
+    if(armed.l&&eL>158&&Math.abs(P[15].y-P[11].y)<0.18){armed.l=false;hit=eL;}
+    if(armed.r&&eR>158&&Math.abs(P[16].y-P[12].y)<0.18){armed.r=false;hit=eR;}
+    if(eL<120)armed.l=true;if(eR<120)armed.r=true;
+    if(hit){count++;const f=gs(hit,172,10);
+      return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext'};}
+    return{form:guard,msg:'punch_guard'};}};}
+
+/* =========================================================
+   CATALOGUE — noms/tips localisés {fr,en,es}
+   ========================================================= */
+const SPORTS=[
+ {id:'muscu',em:'🏋️',theme:'muscu',
+  name:{fr:'Musculation',en:'Strength',es:'Fuerza'},
+  desc:{fr:'Squats, pompes, fentes',en:'Squats, push-ups, lunges',es:'Sentadillas, flexiones, zancadas'},ex:[
+  {id:'squat',em:'🦵',unit:'reps',goal:100,
+   name:{fr:'Squats',en:'Squats',es:'Sentadillas'},
+   tip:{fr:'De face ou de profil, corps entier visible',en:'Front or side view, full body visible',es:'De frente o de perfil, cuerpo completo visible'},
+   make:()=>repEngine({need:[11,12,23,24,25,26,27,28],value:kneeAngle,downAt:105,upAt:160,
+     form:(P,v)=>{const d=gs(v,85,22),b=gs(hipAngle(P),70,45);return Math.round(d*.7+b*.3);},
+     coach:(P,v,st)=>st==='down'?(v<85?'squat_depth':'squat_deeper'):'squat_down'})},
+  {id:'pushup',em:'💥',unit:'reps',goal:60,
+   name:{fr:'Pompes',en:'Push-ups',es:'Flexiones'},
+   tip:{fr:'Téléphone au sol, vue de profil',en:'Phone on the floor, side view',es:'Teléfono en el suelo, vista lateral'},
+   make:()=>repEngine({need:[11,12,13,14,15,16,23,24,27,28],value:elbowAngle,downAt:95,upAt:155,
+     form:(P,v)=>{const d=gs(v,80,20),l=gs(bodyLine(P),178,14);return Math.round(d*.55+l*.45);},
+     coach:(P,v,st)=>bodyLine(P)<160?'push_line':(st==='down'?'push_up':'push_down')})},
+  {id:'lunge',em:'🚶',unit:'reps',goal:60,
+   name:{fr:'Fentes',en:'Lunges',es:'Zancadas'},
+   tip:{fr:'De profil, alterne les jambes',en:'Side view, alternate legs',es:'De perfil, alterna las piernas'},
+   make:()=>repEngine({need:[23,24,25,26,27,28],
+     value:P=>Math.min(ang(P[23],P[25],P[27]),ang(P[24],P[26],P[28])),downAt:100,upAt:160,
+     form:(P,v)=>gs(v,90,20),coach:(P,v,st)=>st==='down'?'lunge_up':'lunge_step'})}]},
+ {id:'gainage',em:'🛡️',theme:'gainage',
+  name:{fr:'Gainage',en:'Core',es:'Core'},
+  desc:{fr:'Planche chronométrée',en:'Timed plank',es:'Plancha cronometrada'},ex:[
+  {id:'plank',em:'➖',unit:'sec',goal:300,
+   name:{fr:'Planche',en:'Plank',es:'Plancha'},
+   tip:{fr:'Téléphone au sol, profil complet',en:'Phone on the floor, full side view',es:'Teléfono en el suelo, perfil completo'},
+   make:()=>holdEngine({need:[11,12,23,24,27,28],form:P=>gs(bodyLine(P),178,12),
+     coach:(P,f)=>f>=90?'plank_hold':'plank_fix',badMsg:'plank_bad'})}]},
+ {id:'yoga',em:'🧘',theme:'yoga',
+  name:{fr:'Yoga',en:'Yoga',es:'Yoga'},
+  desc:{fr:'Guerrier II, arbre',en:'Warrior II, tree',es:'Guerrero II, árbol'},ex:[
+  {id:'warrior',em:'⚔️',unit:'sec',goal:120,
+   name:{fr:'Guerrier II',en:'Warrior II',es:'Guerrero II'},
+   tip:{fr:"De face, bras à l'horizontale",en:'Front view, arms horizontal',es:'De frente, brazos horizontales'},
+   make:()=>holdEngine({need:[11,12,13,14,15,16,23,24,25,26,27,28],
+     form:P=>{const k=gs(Math.min(ang(P[23],P[25],P[27]),ang(P[24],P[26],P[28])),95,25);
+       const a=gs(avg(Math.abs(P[15].y-P[11].y),Math.abs(P[16].y-P[12].y))*100,0,8);
+       const e=gs(elbowAngle(P),175,15);return Math.round(k*.4+a*.35+e*.25);},
+     coach:(P,f)=>f>=90?'warrior_hold':'warrior_fix',badMsg:'warrior_bad'})},
+  {id:'tree',em:'🌳',unit:'sec',goal:120,
+   name:{fr:'Arbre',en:'Tree pose',es:'Árbol'},
+   tip:{fr:'De face, un pied contre la jambe opposée',en:'Front view, one foot on the opposite leg',es:'De frente, un pie contra la pierna opuesta'},
+   make:()=>holdEngine({need:[23,24,25,26,27,28],
+     form:P=>{const lift=Math.abs(P[27].y-P[28].y);const r=gs(lift*100,18,10);
+       const h=gs(Math.abs(P[23].y-P[24].y)*100,0,4);return Math.round(r*.6+h*.4);},
+     coach:(P,f)=>f>=90?'tree_hold':'tree_fix',badMsg:'tree_bad'})}]},
+ {id:'pilates',em:'🌀',theme:'pilates',
+  name:{fr:'Pilates',en:'Pilates',es:'Pilates'},
+  desc:{fr:'Pont fessier',en:'Glute bridge',es:'Puente de glúteos'},ex:[
+  {id:'bridge',em:'🌉',unit:'reps',goal:80,
+   name:{fr:'Pont fessier',en:'Glute bridge',es:'Puente de glúteos'},
+   tip:{fr:'Allongé de profil, téléphone au sol',en:'Lying down, side view, phone on floor',es:'Tumbado de perfil, teléfono en el suelo'},
+   make:()=>repEngine({need:[11,12,23,24,25,26],value:hipAngle,downAt:130,upAt:165,
+     form:(P,v)=>gs(hipAngle(P),175,15),coach:(P,v,st)=>st==='down'?'bridge_up':'bridge_down'})}]},
+ {id:'street',em:'🤸',theme:'street',
+  name:{fr:'Street Workout',en:'Street Workout',es:'Street Workout'},
+  desc:{fr:'Jumping jacks, squats sautés',en:'Jumping jacks, jump squats',es:'Jumping jacks, sentadillas con salto'},ex:[
+  {id:'jacks',em:'⭐',unit:'reps',goal:150,
+   name:{fr:'Jumping Jacks',en:'Jumping Jacks',es:'Jumping Jacks'},
+   tip:{fr:'De face, corps entier visible',en:'Front view, full body visible',es:'De frente, cuerpo completo visible'},
+   make:()=>repEngine({need:[11,12,15,16,27,28],
+     value:P=>{const arms=(avg(P[15].y,P[16].y)<avg(P[11].y,P[12].y)-0.05)?1:0;
+       const legs=Math.abs(P[27].x-P[28].x);return arms&&legs>0.22?50:170;},
+     downAt:100,upAt:160,form:()=>95,coach:()=>'jacks'})},
+  {id:'jsquat',em:'🚀',unit:'reps',goal:60,
+   name:{fr:'Squats sautés',en:'Jump squats',es:'Sentadillas con salto'},
+   tip:{fr:'De face ou de profil',en:'Front or side view',es:'De frente o de perfil'},
+   make:()=>repEngine({need:[23,24,25,26,27,28],value:kneeAngle,downAt:110,upAt:165,
+     form:(P,v)=>gs(v,90,25),coach:(P,v,st)=>st==='down'?'jsq_up':'jsq_down'})}]},
+ {id:'boxe',em:'🥊',theme:'boxe',
+  name:{fr:'Boxe anglaise',en:'Boxing',es:'Boxeo'},
+  desc:{fr:'Jab & cross',en:'Jab & cross',es:'Jab y cross'},ex:[
+  {id:'jab',em:'👊',unit:'hits',goal:300,
+   name:{fr:'Jab & Cross',en:'Jab & Cross',es:'Jab y Cross'},
+   tip:{fr:'De face, garde haute',en:'Front view, guard up',es:'De frente, guardia alta'},
+   make:punchEngine}]},
+ {id:'thai',em:'🦿',theme:'thai',
+  name:{fr:'Boxe thaï',en:'Muay Thai',es:'Muay Thai'},
+  desc:{fr:'Coups de genou, directs',en:'Knee strikes, punches',es:'Rodillazos, directos'},ex:[
+  {id:'knee',em:'🦵',unit:'hits',goal:100,
+   name:{fr:'Coups de genou',en:'Knee strikes',es:'Rodillazos'},
+   tip:{fr:'De face ou léger profil',en:'Front or slight side view',es:'De frente o perfil ligero'},
+   make:()=>repEngine({need:[23,24,25,26],
+     value:P=>Math.min(P[25].y-P[23].y,P[26].y-P[24].y)<-0.02?60:170,downAt:100,upAt:160,
+     form:P=>gs(Math.min(P[25].y-P[23].y,P[26].y-P[24].y)*100,-12,8),
+     coach:(P,v,st)=>st==='down'?'knee_hit':'knee_up'})},
+  {id:'punch2',em:'👊',unit:'hits',goal:300,
+   name:{fr:'Directs',en:'Straight punches',es:'Directos'},
+   tip:{fr:'De face, garde haute',en:'Front view, guard up',es:'De frente, guardia alta'},
+   make:punchEngine}]}
+];
+const findEx=id=>{for(const s of SPORTS)for(const e of s.ex)if(e.id===id)return{...e,sport:s};};
+
+/* =========================================================
+   UI
+   ========================================================= */
+const $=id=>document.getElementById(id);
+const THEME_C={muscu:'#FF6B00',gainage:'#00D4FF',yoga:'#A78BFA',pilates:'#FF4FA3',street:'#B8FF29',boxe:'#FF2244',thai:'#FFC531'};
+function setTheme(t){document.body.dataset.theme=t;}
+function show(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $('screen-'+n).classList.add('active');}
+window.closeModal=id=>$(id).classList.remove('show');
+function toast(m){const t=$('toast');t.textContent=m;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');}
+window.goHome=()=>{setTheme('muscu');renderHome();show('home');};
+
+function applyLangStatic(){
+  const T=L();
+  $('home-sub').textContent=T.sub;
+  $('st-sports').textContent=T.sports; $('st-goals').textContent=T.goals;
+  // onglets
+  $('nt-train').textContent=T.tabTrain;$('nt-stats').textContent=T.tabStats;
+  $('nt-board').textContent=T.tabBoard;$('nt-challenge').textContent=T.tabChallenge;
+  $('stat-reps-l').textContent=T.statReps;$('stat-streak-l').textContent=T.statStreak;
+  $('stat-sats-l').textContent=T.statSats;$('stat-perfect-l').textContent=T.statPerfect;
+  $('st-week7').textContent=T.week7;$('st-bydisc').textContent=T.byDisc;
+  $('board-intro').textContent=T.boardIntro;$('board-refresh').textContent=T.boardRefresh;
+  $('board-publish').textContent=T.publish;
+  $('fi-perfect').textContent='+'+CFG.SATS_PERFECT; $('fi-perfect-l').textContent=T.perfectL;
+  $('fi-combo').textContent='x'+(CFG.COMBO_TIERS[0]?.at||5); $('fi-combo-l').textContent=T.comboL;
+  $('fi-goal').textContent='+'+CFG.SATS_WEEKLY_GOAL; $('fi-goal-l').textContent=T.goalL;
+  $('btn-stop').textContent=T.stop; $('btn-cam').textContent=T.cam;
+  $('ring-lbl').textContent=T.form; $('lang-title').textContent=T.langTitle;
+  $('acc-title').textContent=T.account;
+  $('btn-lang').textContent=S.lang.toUpperCase();
+  $('btn-voice').textContent=S.voice?'🔊':'🔇'; $('btn-voice').classList.toggle('off',!S.voice);
+  ['fr','en','es'].forEach(l=>$('lb-'+l).classList.toggle('sel',l===S.lang));
+  document.documentElement.lang=S.lang;
+}
+window.openLang=()=>$('modal-lang').classList.add('show');
+window.setLang=l=>{S.lang=l;store.set('powlang',l);closeModal('modal-lang');
+  applyLangStatic();renderHome();say(L().voice.start,{force:true});};
+
+function renderHome(){
+  ensureWeek();
+  $('balance-val').textContent=S.balance;
+  const T=L(),grid=$('sports-grid');grid.innerHTML='';
+  SPORTS.forEach(sp=>{const b=document.createElement('button');b.className='card';
+    b.style.setProperty('--c',THEME_C[sp.theme]);
+    b.innerHTML=`<span class="em">${sp.em}</span><h3>${sp.name[S.lang]}</h3><p>${sp.desc[S.lang]}</p>`;
+    b.onclick=()=>openSport(sp);grid.appendChild(b);});
+  const gl=$('goals-list');gl.innerHTML='';
+  SPORTS.flatMap(s=>s.ex).forEach(e=>{
+    const p=S.week.progress[e.id]||0,pct=Math.min(100,Math.round(p/e.goal*100)),done=p>=e.goal;
+    const d=document.createElement('div');d.className='goal'+(done?' done':'');
+    d.innerHTML=`<div class="row"><span>${e.em} ${e.name[S.lang]}</span><b>${done?T.goalDone(CFG.SATS_WEEKLY_GOAL):p+' / '+e.goal+' '+T[e.unit]}</b></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>`;
+    gl.appendChild(d);});
+}
+function openSport(sp){
+  setTheme(sp.theme);
+  $('sport-title').textContent=sp.name[S.lang];
+  const l=$('exercise-list');l.innerHTML='';
+  sp.ex.forEach(e=>{const p=S.week.progress[e.id]||0;
+    const b=document.createElement('button');b.className='exrow';
+    b.innerHTML=`<span class="em">${e.em}</span><div class="meta"><h3>${e.name[S.lang]}</h3>
+      <p>${p} / ${e.goal} ${L()[e.unit]} ${L().week} · ${e.tip[S.lang]}</p></div><span class="go">▶</span>`;
+    b.onclick=()=>startWorkout(e.id);l.appendChild(b);});
+  show('sport');
+}
+
+/* =========================================================
+   WORKOUT — caméra + boucle
+   ========================================================= */
+async function loadModel(){
+  if(S.landmarker)return;
+  const fs=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  // modèle "full" = bien plus précis que "lite" sur les articulations
+  S.landmarker=await PoseLandmarker.createFromOptions(fs,{
+    baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",delegate:"GPU"},
+    runningMode:"VIDEO",numPoses:1,
+    minPoseDetectionConfidence:0.6, minPosePresenceConfidence:0.6, minTrackingConfidence:0.6});
+}
+/* ---- lissage temporel des landmarks (One-Euro-like) : supprime le tremblement ---- */
+let smoothLM=null;
+function smoothLandmarks(P){
+  if(!smoothLM || smoothLM.length!==P.length){ smoothLM=P.map(p=>({...p})); return smoothLM; }
+  const a=0.5; // 0=figé, 1=brut ; 0.5 = bon compromis réactivité/stabilité
+  for(let i=0;i<P.length;i++){
+    smoothLM[i].x=smoothLM[i].x+a*(P[i].x-smoothLM[i].x);
+    smoothLM[i].y=smoothLM[i].y+a*(P[i].y-smoothLM[i].y);
+    smoothLM[i].z=(smoothLM[i].z||0)+a*((P[i].z||0)-(smoothLM[i].z||0));
+    smoothLM[i].visibility=P[i].visibility;
+  }
+  return smoothLM;
+}
+async function startCamera(){
+  const v=$('video');
+  if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+  v.srcObject=stream;await v.play();
+  const c=$('overlay');c.width=v.videoWidth;c.height=v.videoHeight;
+  S.ctx=c.getContext('2d');S.drawer=new DrawingUtils(S.ctx);
+  const mir=S.facing==='user'?'scaleX(-1)':'none';
+  v.style.transform=mir;c.style.transform=mir;
+}
+window.flipCamera=async()=>{S.facing=S.facing==='user'?'environment':'user';
+  try{await startCamera();}catch(e){toast(L().camFail.split('\n')[0]);}};
+
+/* =========================================================
+   POSES GUIDES — silhouette cible en coordonnées normalisées (0..1)
+   Squelette de départ que l'utilisateur doit imiter avant le GO.
+   idx MediaPipe : 0 nez,11/12 épaules,13/14 coudes,15/16 poignets,
+   23/24 hanches,25/26 genoux,27/28 chevilles
+   ========================================================= */
+const GUIDE_CONNS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+function standPose(){ // debout de face, bras le long du corps
+  return {0:[.5,.12],11:[.42,.28],12:[.58,.28],13:[.40,.45],14:[.60,.45],15:[.39,.60],16:[.61,.60],
+    23:[.44,.55],24:[.56,.55],25:[.44,.75],26:[.56,.75],27:[.44,.93],28:[.56,.93]};
+}
+const GUIDES={
+  squat:standPose(), jsquat:standPose(), lunge:standPose(), knee:standPose(),
+  jacks:{0:[.5,.12],11:[.40,.28],12:[.60,.28],13:[.30,.20],14:[.70,.20],15:[.24,.10],16:[.76,.10],
+    23:[.44,.55],24:[.56,.55],25:[.38,.75],26:[.62,.75],27:[.34,.93],28:[.66,.93]},
+  jab:{0:[.5,.14],11:[.40,.30],12:[.60,.30],13:[.34,.42],14:[.66,.42],15:[.42,.34],16:[.58,.34],
+    23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
+  punch2:{0:[.5,.14],11:[.40,.30],12:[.60,.30],13:[.34,.42],14:[.66,.42],15:[.42,.34],16:[.58,.34],
+    23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
+  pushup:{0:[.16,.55],11:[.30,.50],12:[.30,.60],13:[.44,.52],14:[.44,.62],15:[.58,.52],16:[.58,.62],
+    23:[.58,.52],24:[.58,.62],25:[.74,.53],26:[.74,.63],27:[.90,.55],28:[.90,.65]},
+  plank:{0:[.14,.52],11:[.28,.48],12:[.28,.58],13:[.30,.62],14:[.30,.70],15:[.30,.74],16:[.30,.80],
+    23:[.56,.50],24:[.56,.60],25:[.74,.52],26:[.74,.62],27:[.90,.54],28:[.90,.64]},
+  bridge:{0:[.14,.60],11:[.30,.56],12:[.30,.64],13:[.24,.66],14:[.24,.74],15:[.20,.72],16:[.20,.80],
+    23:[.56,.44],24:[.56,.52],25:[.74,.60],26:[.74,.68],27:[.88,.74],28:[.88,.82]},
+  warrior:{0:[.5,.16],11:[.42,.32],12:[.58,.32],13:[.26,.32],14:[.74,.32],15:[.12,.32],16:[.88,.32],
+    23:[.44,.56],24:[.56,.56],25:[.30,.72],26:[.62,.78],27:[.22,.92],28:[.66,.94]},
+  tree:{0:[.5,.12],11:[.42,.26],12:[.58,.26],13:[.36,.14],14:[.64,.14],15:[.42,.06],16:[.58,.06],
+    23:[.45,.54],24:[.55,.54],25:[.45,.74],26:[.60,.60],27:[.45,.93],28:[.52,.62]}
+};
+function drawGuide(exId,align){
+  const g=GUIDES[exId]; if(!g)return;
+  const W=S.ctx.canvas.width,H=S.ctx.canvas.height,c=getComputedStyle(document.body);
+  const col=align>=0.72?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
+  S.ctx.save();
+  S.ctx.globalAlpha=0.35+0.35*Math.sin(Date.now()/380); // respiration
+  S.ctx.strokeStyle=col;S.ctx.lineWidth=10;S.ctx.lineCap='round';S.ctx.lineJoin='round';
+  S.ctx.shadowColor=col;S.ctx.shadowBlur=18;
+  GUIDE_CONNS.forEach(([a,b])=>{ if(g[a]&&g[b]){
+    S.ctx.beginPath();S.ctx.moveTo(g[a][0]*W,g[a][1]*H);S.ctx.lineTo(g[b][0]*W,g[b][1]*H);S.ctx.stroke(); }});
+  if(g[0]){ S.ctx.beginPath();S.ctx.arc(g[0][0]*W,g[0][1]*H,W*0.045,0,7);S.ctx.stroke(); }
+  S.ctx.restore();
+}
+// score d'alignement (0..1) entre pose détectée et guide
+function alignScore(P,exId){
+  const g=GUIDES[exId]; if(!g)return 0;
+  const ids=Object.keys(g).map(Number).filter(i=>i!==0);
+  let sum=0,n=0;
+  for(const i of ids){ if(!P[i]||(P[i].visibility!==undefined&&P[i].visibility<0.5))return 0;
+    const dx=P[i].x-g[i][0], dy=P[i].y-g[i][1]; sum+=Math.hypot(dx,dy); n++; }
+  if(!n)return 0;
+  const d=sum/n; // distance moyenne normalisée
+  return Math.max(0,Math.min(1,1-d/0.22));
+}
+
+let lastVideoTime=-1,smoothForm=0;
+const GROUND_EX=['pushup','plank','bridge']; // téléphone au sol → caméra arrière
+async function startWorkout(exId){
+  ensureWeek();ensureDay();
+  S.ex=findEx(exId);S.engine=S.ex.make();S.combo=0;S.comboTier=0;S.sessionSats=0;
+  S.phase='align';S.countdown=0;smoothLM=null;S.alignHold=0;S.cdStarted=false;
+  S.facing=GROUND_EX.includes(exId)?'environment':'user'; // arrière pour le sol
+  setTheme(S.ex.sport.theme);
+  $('wk-exname').textContent=S.ex.name[S.lang];
+  $('wk-tip').textContent=S.ex.tip[S.lang];
+  $('wk-unit').textContent=L()[S.ex.unit];
+  $('wk-count').textContent=S.week.progress[exId]||0;
+  $('session-sats').textContent='';$('combo-chip').className='combo-chip';$('align-meter').classList.remove('show');
+  show('workout');
+  const pill=$('statuspill');pill.textContent=L().loading;pill.classList.add('show');pill.classList.remove('big');
+  try{
+    await loadModel();
+    pill.textContent=L().camOn;
+    await startCamera();
+    pill.classList.remove('show');
+    S.running=true;requestAnimationFrame(loop);
+  }catch(e){console.error(e);pill.textContent=L().camFail;pill.classList.add('show');}
+}
+function loop(now){
+  if(!S.running)return;
+  const v=$('video');
+  if(v.currentTime!==lastVideoTime&&v.videoWidth){
+    lastVideoTime=v.currentTime;
+    const res=S.landmarker.detectForVideo(v,now);
+    S.ctx.clearRect(0,0,S.ctx.canvas.width,S.ctx.canvas.height);
+    if(res.landmarks&&res.landmarks[0]){
+      const P=smoothLandmarks(res.landmarks[0]);
+      if(S.phase==='align') phaseAlign(P,now);
+      else { $('align-meter').classList.remove('show'); drawSkeleton(P); handle(S.engine.analyze(P,now)); }
+    }else{
+      if(S.phase==='align'){ drawGuide(S.ex.id,0); $('statuspill').textContent=L().coach.frame;
+        $('statuspill').classList.add('show'); $('align-meter').classList.remove('show'); S.alignHold=0; S.cdStarted=false; }
+      else coachMsg('lost');
+    }
+  }
+  requestAnimationFrame(loop);
+}
+/* phase d'alignement : imiter la silhouette pour lancer le compte à rebours */
+function phaseAlign(P,now){
+  const a=alignScore(P,S.ex.id);
+  drawGuide(S.ex.id,a);
+  drawSkeleton(P,0.55);
+  const pill=$('statuspill'),meter=$('align-meter');
+  // jauge d'alignement visible pendant toute la phase (sauf compte à rebours)
+  meter.classList.add('show');
+  $('align-fill').style.width=Math.round(a*100)+'%';
+  $('align-lbl').textContent=a>=0.72?'✓':(Math.round(a*100)+'%');
+  if(a>=0.72){
+    S.alignHold=(S.alignHold||0)+1;
+    if(S.alignHold===1) say(L().voice.getReady,{force:true});
+    const need=16;
+    if(S.alignHold>=need){
+      meter.classList.remove('show');
+      if(!S.cdStarted){ S.cdStarted=true; S.cdVal=3; S.cdNext=now; }
+      if(now>=S.cdNext){
+        if(S.cdVal>0){ pill.textContent=String(S.cdVal); pill.classList.add('show','big');
+          say(String(S.cdVal),{force:true}); if(navigator.vibrate)navigator.vibrate(20); S.cdVal--; S.cdNext=now+800; }
+        else { pill.classList.remove('show','big'); S.cdStarted=false;
+          S.phase='live'; coachMsg(null); say(L().voice.start,{force:true});
+          if(navigator.vibrate)navigator.vibrate([60,40,120]); }
+      }
+    } else { pill.textContent=L().alignHold; pill.classList.add('show'); pill.classList.remove('big'); }
+  } else {
+    S.alignHold=0; S.cdStarted=false;
+    pill.textContent=L().alignPose; pill.classList.add('show'); pill.classList.remove('big');
+  }
+}
+function drawSkeleton(P,alpha){
+  const c=getComputedStyle(document.body);
+  S.ctx.save();S.ctx.globalAlpha=alpha||1;S.ctx.shadowColor=c.getPropertyValue('--acc');S.ctx.shadowBlur=12;
+  S.drawer.drawConnectors(P,PoseLandmarker.POSE_CONNECTIONS,{color:c.getPropertyValue('--acc').trim(),lineWidth:4});
+  S.drawer.drawLandmarks(P,{color:c.getPropertyValue('--acc2').trim(),radius:4});
+  S.ctx.restore();
+}
+function coachMsg(key){$('coachmsg').textContent=key?(L().coach[key]||key):'';}
+function setRing(f){
+  const r=$('ring'),C=194.8;
+  if(f===null){r.style.strokeDashoffset=C;$('ring-num').textContent='—';return;}
+  smoothForm=smoothForm*0.7+f*0.3;
+  const s=Math.round(smoothForm);
+  r.style.strokeDashoffset=C*(1-s/100);
+  r.style.stroke=s>=CFG.PERFECT_THRESHOLD?'var(--grn)':s>=60?'var(--acc)':'var(--hot)';
+  $('ring-num').textContent=s;
+}
+function handle(r){
+  setRing(r.form);if(r.msg)coachMsg(r.msg);
+  if(r.rep)onScore(r.repForm);
+  if(r.tick)onScore(r.tickForm);
+}
+
+/* =========================================================
+   FAUCET — combos, plafond, paiement
+   ========================================================= */
+function comboSats(){
+  let sats=CFG.SATS_PERFECT;
+  for(const t of CFG.COMBO_TIERS) if(S.combo>=t.at) sats=t.sats;
+  return sats;
+}
+function earn(sats){
+  ensureDay();
+  const grant=Math.min(sats,capLeft());
+  if(grant>0){S.balance+=grant;S.day.earned+=grant;S.sessionSats+=grant;
+    $('session-sats').textContent=L().sessionSats(S.sessionSats);
+    persist();}
+  if(grant<sats){coachMsg(null);$('coachmsg').textContent=L().capHit;say(L().voice.cap);}
+  return grant;
+}
+function onScore(form){
+  const id=S.ex.id,T=L();
+  const before=S.week.progress[id]||0;
+  S.week.progress[id]=before+1;
+  $('wk-count').textContent=S.week.progress[id];
+  const perfect=form>=CFG.PERFECT_THRESHOLD;
+  let gotSats=0;
+
+  if(perfect){
+    S.combo++;
+    const sats=comboSats(),got=earn(sats);gotSats=got;
+    if(got>0){satPop('+'+got+' ⚡',true);flash();}
+    // palier de combo franchi ?
+    const tier=CFG.COMBO_TIERS.filter(t=>S.combo>=t.at).length;
+    if(tier>S.comboTier){S.comboTier=tier;showCombo(S.combo);say(T.voice.combo(S.combo),{force:true});
+      if(navigator.vibrate)navigator.vibrate([40,50,40,50,90]);}
+    else{say(T.voice.perfect);if(navigator.vibrate)navigator.vibrate(30);}
+    const chip=$('combo-chip');chip.textContent=T.combo+' x'+S.combo;chip.className='combo-chip show';
+  }else{
+    if(S.combo>=(CFG.COMBO_TIERS[0]?.at||5)){
+      const chip=$('combo-chip');chip.textContent=T.comboBroken;chip.className='combo-chip show broken';
+      say(T.voice.comboBroken);setTimeout(()=>{chip.className='combo-chip';},1200);
+    } else $('combo-chip').className='combo-chip';
+    S.combo=0;S.comboTier=0;
+    if(S.ex.unit!=='sec')satPop('+1',false);
+  }
+  // stats à vie + défis
+  bumpStat(S.ex.sport.id,perfect,gotSats);
+  bumpChallenges(id);
+  // jalons vocaux (toutes les 10)
+  if(S.week.progress[id]%10===0)say(T.voice.milestone(S.week.progress[id],S.ex.unit));
+  // objectif hebdo
+  if(before<S.ex.goal&&S.week.progress[id]>=S.ex.goal&&!S.claimed[id]){
+    S.claimed[id]=true;
+    const got=earn(CFG.SATS_WEEKLY_GOAL);
+    satPop('🏆 +'+got+' ⚡',true);flash();
+    $('coachmsg').textContent='🏆 '+T.voice.goal;
+    say(T.voice.goal,{force:true});
+    if(navigator.vibrate)navigator.vibrate([80,60,80,60,180]);
+  }
+  const bc=$('chip-balance');bc.classList.remove('bump');void bc.offsetWidth;bc.classList.add('bump');
+  $('balance-val').textContent=S.balance;
+}
+function bumpChallenges(exId){
+  let changed=false;
+  for(const c of S.challenges){
+    if(c.done)continue;
+    if(c.ex===exId||c.ex==='any'){ c.prog=(c.prog||0)+1; changed=true;
+      if(c.prog>=c.target){ c.done=true; say(L().voice.goal,{force:true}); }
+    }
+  }
+  if(changed)store.set('powchallenges',S.challenges);
+}
+function satPop(text,perfect){
+  const el=document.createElement('div');el.className='satpop'+(perfect?' perfect':'');
+  el.style.fontSize=perfect?'28px':'20px';
+  el.style.left=(28+Math.random()*44)+'%';el.style.top=(34+Math.random()*22)+'%';
+  el.textContent=text;
+  document.querySelector('.cam-wrap').appendChild(el);
+  setTimeout(()=>el.remove(),1600);
+}
+function flash(){const f=$('flash');f.classList.remove('on');void f.offsetWidth;f.classList.add('on');}
+function showCombo(n){
+  $('combo-x').textContent='x'+n;$('combo-t').textContent=L().combo;
+  const c=$('combo');c.classList.remove('show');void c.offsetWidth;c.classList.add('show');
+}
+window.stopWorkout=()=>{S.running=false;S.phase='align';S.cdStarted=false;speechSynthesis.cancel();
+  $('align-meter').classList.remove('show');$('statuspill').classList.remove('show','big');
+  const v=$('video');if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());
+  v.srcObject=null;goHome();};
+
+/* =========================================================
+   COMPTE — LNURL-auth (connexion par signature wallet)
+   ========================================================= */
+window.openAccount=()=>{
+  const T=L();
+  $('acc-title').textContent=T.account;
+  const inN=!!S.token;
+  $('acc-logged-out').style.display=inN?'none':'block';
+  $('acc-logged-in').style.display=inN?'block':'none';
+  if(inN){
+    $('acc-pubkey').textContent=S.pubkey.slice(0,16)+'…';
+    $('acc-pubkey-full').textContent=S.pubkey;
+    $('acc-lnaddr-label').textContent=T.accLnaddrLabel;
+    $('acc-lnaddr').value=S.lnaddr||'';
+    $('acc-logout').textContent=T.accLogout;$('acc-save').textContent=T.accSave;
+  }else{
+    $('acc-out-text').textContent=T.accOutText;
+    $('acc-close1').textContent=T.cancel;$('acc-login-btn').textContent=T.accLogin;
+  }
+  $('modal-account').classList.add('show');
+};
+window.saveAccount=()=>{ S.lnaddr=$('acc-lnaddr').value.trim(); store.set('powlnaddr',S.lnaddr);
+  closeModal('modal-account');toast(L().saved);updateAccountBadge(); };
+window.logout=()=>{ S.token='';S.pubkey='';store.set('powtoken','');store.set('powpubkey','');
+  closeModal('modal-account');updateAccountBadge();toast(L().accLogout); };
+function updateAccountBadge(){ $('btn-account').textContent=S.token?'✅':'👤'; }
+
+window.startLogin=async()=>{
+  const T=L();
+  closeModal('modal-account');
+  try{
+    const r=await fetch(API()+'/auth/challenge');
+    const d=await r.json();
+    if(!d.lnurl)throw new Error(d.error||'challenge');
+    S.loginK1=d.k1;S.lastLoginLnurl=d.lnurl;
+    $('login-title').textContent=T.loginTitle;$('login-sub').textContent=T.loginSub;
+    $('login-status').textContent=T.loginWaiting;
+    $('login-cancel').textContent=T.loginCancel;$('login-copy').textContent=T.copy;
+    $('login-qrbox').innerHTML='';
+    new QRCode($('login-qrbox'),{text:d.encoded.toUpperCase(),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+    $('modal-login').classList.add('show');
+    // polling
+    let tries=0;
+    S.loginTimer=setInterval(async()=>{
+      tries++;
+      if(tries>150){cancelLogin();return;} // ~5 min
+      try{
+        const pr=await fetch(API()+'/auth/poll?k1='+S.loginK1);
+        const pd=await pr.json();
+        if(pd.status==='ok'){
+          clearInterval(S.loginTimer);
+          S.token=pd.token;S.pubkey=pd.pubkey;
+          store.set('powtoken',S.token);store.set('powpubkey',S.pubkey);
+          $('login-status').textContent=T.loginOk;
+          if(navigator.vibrate)navigator.vibrate([60,40,120]);
+          setTimeout(()=>{closeModal('modal-login');updateAccountBadge();openAccount();},700);
+        }else if(pd.status==='expired'){ clearInterval(S.loginTimer);$('login-status').textContent=T.loginExpired; }
+      }catch(e){}
+    },2000);
+  }catch(e){ toast(L().err+(e.message||'')); }
+};
+window.cancelLogin=()=>{ if(S.loginTimer)clearInterval(S.loginTimer); closeModal('modal-login'); };
+window.copyLoginLnurl=async()=>{ try{await navigator.clipboard.writeText(S.lastLoginLnurl);toast(L().copied);}catch(e){toast(L().copyFail);} };
+
+/* =========================================================
+   RETRAIT — Lightning Address (auto) ou LNURL-withdraw (QR)
+   ========================================================= */
+window.setMethod=(m)=>{ S.method=m;store.set('powmethod',m);
+  $('mt-lnaddr').classList.toggle('sel',m==='lnaddress');
+  $('mt-lnurl').classList.toggle('sel',m==='lnurl');
+  $('lnaddr-field').style.display=m==='lnaddress'?'block':'none';
+  $('lnurl-note').style.display=m==='lnurl'?'block':'none';
+};
+window.openClaim=()=>{
+  const T=L();
+  if(S.balance<=0){toast(T.noSats);return;}
+  if(S.balance<CFG.MIN_CLAIM_SATS){toast(T.minClaim(CFG.MIN_CLAIM_SATS));return;}
+  if(CFG.REQUIRE_AUTH && !S.token){toast(T.authRequired);openAccount();return;}
+  $('pc-title').textContent=T.pcTitle;
+  // on ne peut retirer qu'au plus MAX_CLAIM_SATS à la fois (limite serveur)
+  $('pc-text').innerHTML=T.pcText(Math.min(S.balance,CFG.MAX_CLAIM_SATS||100));
+  $('mt-lnaddr').textContent=T.mLnaddr;$('mt-lnurl').textContent=T.mLnurl;
+  $('lnaddr-label').textContent=T.lnaddrLabel;$('lnaddr-hint').textContent=T.lnaddrHint;
+  $('lnurl-note').textContent=T.lnurlNote;
+  $('lnaddr-input').value=S.lnaddr||'';
+  $('pc-later').textContent=T.later;$('btn-doclaim').textContent=T.payDo;
+  setMethod(S.method||'lnaddress');
+  $('modal-preclaim').classList.add('show');
+};
+window.doClaim=async()=>{
+  const T=L(),amount=Math.min(S.balance,CFG.MAX_CLAIM_SATS||100),btn=$('btn-doclaim');
+  const method=S.method||'lnaddress';
+  let lnaddr='';
+  if(method==='lnaddress'){
+    lnaddr=$('lnaddr-input').value.trim();
+    if(!lnaddr){toast(T.noLnaddr);return;}
+    S.lnaddr=lnaddr;store.set('powlnaddr',lnaddr);
+  }
+  btn.disabled=true;btn.textContent=T.creating;
+  try{
+    const r=await fetch(API()+'/claim',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({amount,method,lnaddress:lnaddr,token:S.token})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||T.errWithdraw);
+    closeModal('modal-preclaim');
+    if(d.method==='lnaddress' && d.paid){
+      // payé automatiquement — déduit seulement le montant retiré (retrait partiel possible)
+      S.balance=Math.max(0,S.balance-amount);persist();renderHome();
+      $('claim-title').textContent=T.paidOk(amount);
+      $('claim-sub').textContent=T.paidSub;
+      $('qrbox').innerHTML='';$('claim-actions').style.display='flex';
+      $('claim-copy').style.display='none';$('claim-close').textContent=T.close;
+      $('modal-claim').classList.add('show');
+      if(navigator.vibrate)navigator.vibrate([60,40,120,40,180]);
+    }else if(d.lnurl){
+      // QR à scanner — déduit le montant retiré
+      S.lastLnurl=d.lnurl;S.balance=Math.max(0,S.balance-amount);persist();renderHome();
+      $('claim-title').textContent='⚡ '+amount+' SATS';
+      $('claim-sub').textContent=T.claimSub;
+      $('qrbox').innerHTML='';$('claim-actions').style.display='flex';
+      $('claim-copy').style.display='';$('claim-copy').textContent=T.copy;$('claim-close').textContent=T.close;
+      new QRCode($('qrbox'),{text:('lightning:'+d.lnurl).toUpperCase(),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+      $('modal-claim').classList.add('show');
+    }
+  }catch(e){toast(T.err+e.message);}
+  btn.disabled=false;btn.textContent=T.payDo;
+};
+window.copyLnurl=async()=>{try{await navigator.clipboard.writeText(S.lastLnurl);toast(L().copied);}
+  catch(e){toast(L().copyFail);}};
+
+/* =========================================================
+   ONGLETS
+   ========================================================= */
+window.setTab=(t)=>{ S.tab=t;
+  ['train','stats','board','challenge'].forEach(x=>{
+    $('tab-'+x).style.display = x===t?'block':'none';
+    $('nt-'+x).classList.toggle('sel',x===t);
+  });
+  if(t==='stats')renderStats();
+  if(t==='board')loadBoard();
+  if(t==='challenge')renderChallenges();
+};
+
+/* =========================================================
+   STATS + GRAPH (canvas maison, 0 dépendance)
+   ========================================================= */
+function renderStats(){
+  const st=ensureStats(),T=L();
+  $('stat-reps').textContent=st.totalReps;
+  $('stat-streak').textContent=st.streak;
+  $('stat-sats').textContent=st.totalSats;
+  $('stat-perfect').textContent=st.totalReps?Math.round(st.totalPerfect/st.totalReps*100)+'%':'0%';
+  // 7 derniers jours
+  const days=[],vals=[];
+  for(let i=6;i>=0;i--){ const d=new Date(Date.now()-i*864e5).toISOString().slice(0,10);
+    days.push(d.slice(5)); vals.push(st.hist[d]||0); }
+  drawBars($('chart7'),days,vals);
+  // par discipline
+  const wrap=$('disc-bars');wrap.innerHTML='';
+  const max=Math.max(1,...Object.values(st.byDisc));
+  SPORTS.forEach(sp=>{ const v=st.byDisc[sp.id]||0; if(v===0)return;
+    const d=document.createElement('div');d.className='disc-bar';
+    d.innerHTML=`<div class="l"><span>${sp.em} ${sp.name[S.lang]}</span><b>${v}</b></div>
+      <div class="bar"><i style="width:${Math.round(v/max*100)}%;background:${THEME_C[sp.theme]}"></i></div>`;
+    wrap.appendChild(d); });
+  if(!wrap.children.length){ wrap.innerHTML=`<p class="hint">${T.noStats}</p>`; }
+}
+function drawBars(cv,labels,vals){
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||cv.parentElement.clientWidth-28, H=cv.height;
+  cv.width=W*dpr;cv.height=H*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
+  if(!x.roundRect)x.roundRect=(a,b,w,h,r)=>{x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);
+    x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();};
+  x.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.body),acc=cs.getPropertyValue('--acc').trim(),
+    dim=cs.getPropertyValue('--dim').trim(),max=Math.max(1,...vals);
+  const pad=24,bw=(W-pad*2)/labels.length*0.6,gap=(W-pad*2)/labels.length;
+  vals.forEach((v,i)=>{ const bh=(H-34)*(v/max),bx=pad+i*gap+(gap-bw)/2,by=H-24-bh;
+    const g=x.createLinearGradient(0,by,0,H-24);g.addColorStop(0,acc);g.addColorStop(1,'transparent');
+    x.fillStyle=g;x.beginPath();x.roundRect(bx,by,bw,bh,4);x.fill();
+    if(v>0){x.fillStyle=acc;x.font='700 11px Chakra Petch';x.textAlign='center';x.fillText(v,bx+bw/2,by-4);}
+    x.fillStyle=dim;x.font='10px Rajdhani';x.textAlign='center';x.fillText(labels[i],bx+bw/2,H-8); });
+}
+
+/* =========================================================
+   LEADERBOARD NOSTR — publie/lit des scores (kind 30078, addressable)
+   Chaque athlète publie son total de reps sous un tag d-identifiant "powcoach-score".
+   Lecture agrégée depuis plusieurs relays via WebSocket brut (aucune lib).
+   ========================================================= */
+// clé Nostr locale (générée si absente) — identité du leaderboard
+async function nostrKey(){
+  let sk=store.get('pownostrsk','');
+  if(!sk){ const a=new Uint8Array(32);crypto.getRandomValues(a);
+    sk=[...a].map(b=>b.toString(16).padStart(2,'0')).join('');store.set('pownostrsk',sk); }
+  return sk;
+}
+// secp256k1 schnorr : on utilise la lib noble via CDN dynamique (chargée à la 1re pub)
+let nobleReady=null;
+async function loadNoble(){
+  if(nobleReady)return nobleReady;
+  nobleReady=(async()=>{
+    const m=await import('https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.1.0/+esm');
+    return m;
+  })();
+  return nobleReady;
+}
+async function sha256hex(str){ const b=new TextEncoder().encode(str);
+  const h=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+async function signEvent(ev){
+  const secp=await loadNoble();
+  const sk=await nostrKey();
+  ev.pubkey=secp.utils.bytesToHex(secp.schnorr.getPublicKey(sk));
+  store.set('pownostrpub',ev.pubkey);
+  const serial=JSON.stringify([0,ev.pubkey,ev.created_at,ev.kind,ev.tags,ev.content]);
+  ev.id=await sha256hex(serial);
+  const sig=await secp.schnorr.sign(ev.id,sk);
+  ev.sig=secp.utils.bytesToHex(sig);
+  return ev;
+}
+window.publishScore=async()=>{
+  const T=L(),st=ensureStats();
+  if(st.totalReps<1){toast(T.noStats);return;}
+  const btn=$('board-publish');btn.disabled=true;btn.textContent=T.publishing;
+  try{
+    const nick=S.nick||prompt(T.askNick)||('athlete'+Math.floor(Math.random()*9999));
+    S.nick=nick.slice(0,20);store.set('pownick',S.nick);
+    const ev=await signEvent({ kind:30078, created_at:Math.floor(Date.now()/1000),
+      tags:[['d','powcoach-score'],['n',S.nick],['reps',String(st.totalReps)],['streak',String(st.streak)],['t','powcoach']],
+      content:JSON.stringify({reps:st.totalReps,streak:st.streak,perfect:st.totalPerfect,nick:S.nick}) });
+    let ok=0;
+    await Promise.all(DEFAULT_RELAYS.map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
+    toast(ok?T.published(ok):T.pubFail);
+    loadBoard(true);
+  }catch(e){toast(T.err+(e.message||''));}
+  btn.disabled=false;btn.textContent=T.publish;
+};
+function publishTo(url,ev){ return new Promise((res,rej)=>{
+  const ws=new WebSocket(url);const to=setTimeout(()=>{ws.close();rej();},4000);
+  ws.onopen=()=>ws.send(JSON.stringify(["EVENT",ev]));
+  ws.onmessage=(m)=>{ try{const d=JSON.parse(m.data);
+    if(d[0]==='OK'){clearTimeout(to);ws.close();res();}}catch(e){} };
+  ws.onerror=()=>{clearTimeout(to);rej();};
+}); }
+window.loadBoard=async(force)=>{
+  const T=L(),list=$('board-list');
+  if(!force && list.dataset.loaded){return;}
+  list.innerHTML=`<p class="hint">${T.boardLoading}</p>`;
+  const scores=new Map(); // pubkey -> {nick,reps,streak}
+  await Promise.all(DEFAULT_RELAYS.map(r=>queryRelay(r,scores)));
+  const arr=[...scores.values()].sort((a,b)=>b.reps-a.reps).slice(0,50);
+  const myPub=store.get('pownostrpub','');
+  list.innerHTML='';
+  if(!arr.length){ list.innerHTML=`<p class="hint">${T.boardEmpty}</p>`; }
+  arr.forEach((s,i)=>{ const row=document.createElement('div');
+    row.className='board-row'+(i<3?' top'+(i+1):'')+(s.pub===myPub?' me':'');
+    row.innerHTML=`<div class="rank">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div>
+      <div class="who"><b>${esc(s.nick||'anon')}</b><small>${s.pub.slice(0,12)}…</small></div>
+      <div class="score">${s.reps} reps${s.streak>1?' · 🔥'+s.streak:''}</div>`;
+    list.appendChild(row); });
+  list.dataset.loaded='1';
+};
+function queryRelay(url,scores){ return new Promise((res)=>{
+  let ws;try{ws=new WebSocket(url);}catch(e){return res();}
+  const sub='pow'+Math.random().toString(36).slice(2,8);
+  const to=setTimeout(()=>{try{ws.close();}catch(e){}res();},4500);
+  ws.onopen=()=>ws.send(JSON.stringify(["REQ",sub,{kinds:[30078],"#t":["powcoach"],limit:200}]));
+  ws.onmessage=(m)=>{ try{const d=JSON.parse(m.data);
+    if(d[0]==='EVENT'){ const ev=d[2]; let data={};
+      try{data=JSON.parse(ev.content);}catch(e){}
+      const reps=parseInt(data.reps||0,10);
+      const prev=scores.get(ev.pubkey);
+      if(!prev||reps>prev.reps) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10)});
+    } else if(d[0]==='EOSE'){ clearTimeout(to);try{ws.close();}catch(e){}res(); } }catch(e){} };
+  ws.onerror=()=>{clearTimeout(to);res();};
+}); }
+const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+/* =========================================================
+   DÉFIS HEBDO PARTAGEABLES — lien + image générée
+   ========================================================= */
+function renderChallenges(){
+  const T=L();
+  $('st-newchallenge').textContent=T.newChallenge;
+  $('chal-ex-label').textContent=T.chalEx;$('chal-target-label').textContent=T.chalTarget;
+  $('chal-create').textContent=T.chalCreate;
+  // remplir le select
+  const sel=$('chal-ex');sel.innerHTML='';
+  const anyOpt=document.createElement('option');anyOpt.value='any';anyOpt.textContent=T.chalAny;sel.appendChild(anyOpt);
+  SPORTS.flatMap(s=>s.ex).forEach(e=>{ const o=document.createElement('option');o.value=e.id;
+    o.textContent=e.em+' '+e.name[S.lang];sel.appendChild(o); });
+  // défis actifs
+  const wrap=$('challenge-active');wrap.innerHTML='';
+  if(!S.challenges.length){ wrap.innerHTML=`<p class="hint">${T.noChallenge}</p>`; }
+  S.challenges.forEach((c,idx)=>{
+    const ex=c.ex==='any'?null:findEx(c.ex);
+    const name=c.ex==='any'?T.chalAny:(ex?ex.em+' '+ex.name[S.lang]:c.ex);
+    // c.ex et c.target peuvent venir d'un lien de défi (hash) → toujours échapper
+    const safeName=esc(name), prog=parseInt(c.prog,10)||0, tnum=parseInt(c.target,10)||1;
+    const pct=Math.min(100,Math.round(prog/tnum*100));
+    const d=document.createElement('div');d.className='chal-card';
+    d.innerHTML=`<h3>${c.done?'✅ ':'🎯 '}${esc(c.title||name)}</h3>
+      <div class="chal-prog">${safeName} · ${prog} / ${tnum}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="chal-actions">
+        <button class="btn-ghost" onclick="shareChallenge(${idx})">📤 ${T.chalShare}</button>
+        <button class="btn-stop" onclick="deleteChallenge(${idx})">🗑</button>
+      </div>`;
+    wrap.appendChild(d);
+  });
+}
+window.createChallenge=()=>{
+  const T=L(),ex=$('chal-ex').value,target=parseInt($('chal-target').value,10)||100;
+  const c={ id:Math.random().toString(36).slice(2,9), ex, target, prog:0, done:false,
+    week:weekId(), title:'', ts:Date.now() };
+  S.challenges.unshift(c);store.set('powchallenges',S.challenges);
+  renderChallenges();toast(T.chalCreated);
+};
+window.deleteChallenge=(i)=>{ S.challenges.splice(i,1);store.set('powchallenges',S.challenges);renderChallenges(); };
+window.shareChallenge=async(i)=>{
+  const T=L(),c=S.challenges[i];
+  const ex=c.ex==='any'?null:findEx(c.ex);
+  const exName=c.ex==='any'?T.chalAny:(ex?ex.name[S.lang]:c.ex);
+  // lien de défi (paramètres dans le hash — l'app les lit au chargement)
+  const link=location.origin+location.pathname+'#chal='+encodeURIComponent(btoa(JSON.stringify({e:c.ex,t:c.target,n:exName})));
+  // image générée
+  const blob=await challengeImage(exName,c.target,T);
+  try{
+    if(navigator.share && blob){
+      const file=new File([blob],'powcoach-defi.png',{type:'image/png'});
+      await navigator.share({ title:'PoW Coach ⚡', text:T.chalShareText(c.target,exName)+' '+link, files:[file] });
+    }else if(navigator.share){
+      await navigator.share({ title:'PoW Coach ⚡', text:T.chalShareText(c.target,exName), url:link });
+    }else{
+      await navigator.clipboard.writeText(link);toast(T.copied);
+      if(blob)downloadBlob(blob,'powcoach-defi.png');
+    }
+  }catch(e){ try{await navigator.clipboard.writeText(link);toast(T.copied);}catch(_){} }
+};
+function downloadBlob(blob,name){ const u=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000); }
+async function challengeImage(exName,target,T){
+  const W=1080,H=1080,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const x=cv.getContext('2d');
+  const cs=getComputedStyle(document.body),acc=cs.getPropertyValue('--acc').trim();
+  // fond
+  x.fillStyle='#0A0A0C';x.fillRect(0,0,W,H);
+  const g=x.createRadialGradient(W/2,H*0.38,60,W/2,H*0.38,W*0.7);
+  g.addColorStop(0,acc+'40');g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,W,H);
+  // scanlines
+  x.fillStyle='rgba(255,255,255,.02)';for(let y=0;y<H;y+=4)x.fillRect(0,y,W,2);
+  // cadre
+  x.strokeStyle=acc;x.lineWidth=6;x.strokeRect(40,40,W-80,H-80);
+  // titre
+  x.fillStyle=acc;x.font='700 64px Chakra Petch, monospace';x.textAlign='center';
+  x.shadowColor=acc;x.shadowBlur=30;x.fillText('POW · COACH ⚡',W/2,180);
+  x.shadowBlur=0;
+  // défi
+  x.fillStyle='#EDEDF2';x.font='700 44px Chakra Petch, monospace';
+  x.fillText(T.chalImgTitle,W/2,360);
+  x.fillStyle=acc;x.font='700 180px Chakra Petch, monospace';x.shadowColor=acc;x.shadowBlur=40;
+  x.fillText(String(target),W/2,560);x.shadowBlur=0;
+  x.fillStyle='#EDEDF2';x.font='600 56px Chakra Petch, monospace';
+  x.fillText(exName.toUpperCase(),W/2,650);
+  // sous-titre
+  x.fillStyle='#8A8A99';x.font='400 34px Rajdhani, sans-serif';
+  x.fillText(T.chalImgSub,W/2,760);
+  // pied
+  x.fillStyle=acc;x.font='700 40px Chakra Petch, monospace';
+  x.fillText('coachsats.pages.dev',W/2,H-100);
+  return await new Promise(r=>cv.toBlob(r,'image/png'));
+}
+// import d'un défi via lien (#chal=...)
+function importChallengeFromHash(){
+  const m=location.hash.match(/chal=([^&]+)/);
+  if(!m)return;
+  try{ const d=JSON.parse(atob(decodeURIComponent(m[1])));
+    // valide strictement : exercice connu (ou "any") + objectif entier borné
+    const known = d.e==='any' || !!findEx(d.e);
+    const tgt = parseInt(d.t,10);
+    if(known && Number.isFinite(tgt) && tgt>0 && tgt<=100000){
+      if(!S.challenges.some(c=>c.ex===d.e&&c.target===tgt&&!c.done)){
+        S.challenges.unshift({ id:Math.random().toString(36).slice(2,9), ex:d.e, target:tgt, prog:0, done:false,
+          week:weekId(), title:'', ts:Date.now(), imported:true });
+        store.set('powchallenges',S.challenges);
+        toast(L().chalImported);
+      }
+    }
+  }catch(e){}
+  history.replaceState(null,'',location.pathname);
+}
+
+/* ---------- init ---------- */
+ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();
+if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');}
+</script>
+</body>
+</html>

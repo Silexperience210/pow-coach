@@ -1,0 +1,17 @@
+# Cloudflare local dev secrets — NEVER commit
+.dev.vars
+.env
+.env.*
+wrangler.toml.local
+
+# Cloudflare / build output
+.wrangler/
+dist/
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
