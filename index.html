@@ -1038,8 +1038,8 @@ const GUIDES={
     23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
   punch2:{0:[.5,.14],11:[.40,.30],12:[.60,.30],13:[.34,.42],14:[.66,.42],15:[.42,.34],16:[.58,.34],
     23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
-  pushup:{0:[.14,.42],11:[.26,.46],12:[.30,.46],13:[.26,.62],14:[.30,.62],15:[.26,.80],16:[.30,.80],
-    23:[.54,.50],24:[.54,.52],25:[.72,.53],26:[.72,.55],27:[.90,.56],28:[.90,.58]},
+  pushup:{0:[.5,.24],11:[.40,.40],12:[.60,.40],13:[.37,.56],14:[.63,.56],15:[.40,.72],16:[.60,.72],
+    23:[.43,.60],24:[.57,.60],25:[.44,.80],26:[.56,.80],27:[.44,.96],28:[.56,.96]},
   plank:{0:[.14,.52],11:[.28,.48],12:[.28,.58],13:[.30,.62],14:[.30,.70],15:[.30,.74],16:[.30,.80],
     23:[.56,.50],24:[.56,.60],25:[.74,.52],26:[.74,.62],27:[.90,.54],28:[.90,.64]},
   bridge:{0:[.14,.60],11:[.30,.56],12:[.30,.64],13:[.24,.66],14:[.24,.74],15:[.20,.72],16:[.20,.80],
@@ -1084,6 +1084,21 @@ function alignScore(P,exId){
   let sum=0;
   for(let i=0;i<n;i++){const dx=pc[i][0]/ps-gc[i][0]/gs2,dy=pc[i][1]/ps-gc[i][1]/gs2;sum+=Math.hypot(dx,dy);}
   return Math.max(0,Math.min(1,1-(sum/n)/ALIGN_TOL));
+}
+// Exercices "de face" : on n'exige PAS d'imiter pile la silhouette pour lancer le
+// compte à rebours — il suffit de FAIRE FACE à la caméra (épaules visibles,
+// horizontales et écartées = pas de profil) avec au moins une main dans le cadre.
+const FRONT_START=['pushup','jab','punch2'];
+function frontReady(P){
+  const s1=P[11],s2=P[12];
+  if(!s1||!s2)return 0;
+  if(s1.visibility!==undefined&&(s1.visibility<0.5||s2.visibility<0.5))return 0;
+  const sw=Math.abs(s1.x-s2.x), dy=Math.abs(s1.y-s2.y);
+  if(sw<0.10)return 0;        // épaules trop rapprochées → de profil
+  if(dy>sw*0.6)return 0;      // épaules pas horizontales → pas de face
+  const hand=(P[15]&&(P[15].visibility===undefined||P[15].visibility>0.3))
+          || (P[16]&&(P[16].visibility===undefined||P[16].visibility>0.3));
+  return hand?1:0;
 }
 
 let lastVideoTime=-1,smoothForm=0;
@@ -1134,7 +1149,9 @@ function loop(now){
 }
 /* phase d'alignement : imiter la silhouette pour lancer le compte à rebours */
 function phaseAlign(P,now){
-  const a=alignScore(P,S.ex.id);
+  let a=alignScore(P,S.ex.id);
+  // pour les exos "de face", être simplement face caméra suffit à armer le départ
+  if(FRONT_START.includes(S.ex.id)) a=Math.max(a,frontReady(P));
   if(S.cal)calRecord('align',{dbg:{align:+a.toFixed(2)},form:Math.round(a*100)});
   drawGuide(S.ex.id,a);
   drawSkeleton(P,0.55);
