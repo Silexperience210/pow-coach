@@ -511,7 +511,7 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   chalImgTitle:"DÉFI DE LA SEMAINE", chalImgSub:"Relève-le sur PoW Coach ⚡",
   noSats:"Aucun sat à réclamer — au boulot ! 💪", minClaim:(n)=>`Minimum ${n} sats pour réclamer`, notCfg:"⚠ Faucet non configuré par le propriétaire",
   capHit:"Plafond journalier atteint — reviens demain ⚡", err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
-  loading:"⚡ Chargement du modèle IA…", alignPose:"Imite la silhouette pour démarrer", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
+  loading:"⚡ Chargement du modèle IA…", alignPose:"Mets tout ton corps dans le cadre", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
   combo:"COMBO", comboBroken:"COMBO PERDU",
   coach:{ frame:"Place-toi entièrement dans le cadre", lost:"Personne détectée — recule un peu",
@@ -548,7 +548,7 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   chalImgTitle:"CHALLENGE OF THE WEEK", chalImgSub:"Take it on PoW Coach ⚡",
   noSats:"No sats to claim — get to work! 💪", minClaim:(n)=>`Minimum ${n} sats to claim`, notCfg:"⚠ Faucet not configured by owner",
   capHit:"Daily cap reached — come back tomorrow ⚡", err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
-  loading:"⚡ Loading AI model…", alignPose:"Match the silhouette to start", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
+  loading:"⚡ Loading AI model…", alignPose:"Get your whole body in frame", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
   combo:"COMBO", comboBroken:"COMBO LOST",
   coach:{ frame:"Get fully inside the frame", lost:"No one detected — step back a bit",
@@ -585,7 +585,7 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   chalImgTitle:"RETO DE LA SEMANA", chalImgSub:"Acéptalo en PoW Coach ⚡",
   noSats:"Sin sats que reclamar — ¡a entrenar! 💪", minClaim:(n)=>`Mínimo ${n} sats para reclamar`, notCfg:"⚠ Faucet no configurado por el propietario",
   capHit:"Límite diario alcanzado — vuelve mañana ⚡", err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
-  loading:"⚡ Cargando modelo IA…", alignPose:"Imita la silueta para empezar", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
+  loading:"⚡ Cargando modelo IA…", alignPose:"Pon todo tu cuerpo en el encuadre", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
   combo:"COMBO", comboBroken:"COMBO PERDIDO",
   coach:{ frame:"Colócate por completo en el encuadre", lost:"Nadie detectado — aléjate un poco",
@@ -984,8 +984,8 @@ const GUIDES={
     23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
   punch2:{0:[.5,.14],11:[.40,.30],12:[.60,.30],13:[.34,.42],14:[.66,.42],15:[.42,.34],16:[.58,.34],
     23:[.43,.58],24:[.57,.58],25:[.43,.77],26:[.57,.77],27:[.43,.94],28:[.57,.94]},
-  pushup:{0:[.16,.55],11:[.30,.50],12:[.30,.60],13:[.44,.52],14:[.44,.62],15:[.58,.52],16:[.58,.62],
-    23:[.58,.52],24:[.58,.62],25:[.74,.53],26:[.74,.63],27:[.90,.55],28:[.90,.65]},
+  pushup:{0:[.14,.42],11:[.26,.46],12:[.30,.46],13:[.26,.62],14:[.30,.62],15:[.26,.80],16:[.30,.80],
+    23:[.54,.50],24:[.54,.52],25:[.72,.53],26:[.72,.55],27:[.90,.56],28:[.90,.58]},
   plank:{0:[.14,.52],11:[.28,.48],12:[.28,.58],13:[.30,.62],14:[.30,.70],15:[.30,.74],16:[.30,.80],
     23:[.56,.50],24:[.56,.60],25:[.74,.52],26:[.74,.62],27:[.90,.54],28:[.90,.64]},
   bridge:{0:[.14,.60],11:[.30,.56],12:[.30,.64],13:[.24,.66],14:[.24,.74],15:[.20,.72],16:[.20,.80],
@@ -998,7 +998,7 @@ const GUIDES={
 function drawGuide(exId,align){
   const g=GUIDES[exId]; if(!g)return;
   const W=S.ctx.canvas.width,H=S.ctx.canvas.height,c=getComputedStyle(document.body);
-  const col=align>=0.72?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
+  const col=align>=0.6?c.getPropertyValue('--grn').trim():c.getPropertyValue('--acc2').trim();
   S.ctx.save();
   S.ctx.globalAlpha=0.35+0.35*Math.sin(Date.now()/380); // respiration
   S.ctx.strokeStyle=col;S.ctx.lineWidth=10;S.ctx.lineCap='round';S.ctx.lineJoin='round';
@@ -1009,15 +1009,17 @@ function drawGuide(exId,align){
   S.ctx.restore();
 }
 // score d'alignement (0..1) entre pose détectée et guide
+// "readiness" du démarrage : on ne force PLUS à coller pixel par pixel à la
+// silhouette (trop dur, positions absolues). On démarre dès que le corps est
+// suffisamment VISIBLE dans le cadre. La silhouette reste un simple repère,
+// et le comptage des reps (avec le score de forme) fait le vrai travail ensuite.
 function alignScore(P,exId){
   const g=GUIDES[exId]; if(!g)return 0;
   const ids=Object.keys(g).map(Number).filter(i=>i!==0);
-  let sum=0,n=0;
-  for(const i of ids){ if(!P[i]||(P[i].visibility!==undefined&&P[i].visibility<0.5))return 0;
-    const dx=P[i].x-g[i][0], dy=P[i].y-g[i][1]; sum+=Math.hypot(dx,dy); n++; }
-  if(!n)return 0;
-  const d=sum/n; // distance moyenne normalisée
-  return Math.max(0,Math.min(1,1-d/0.22));
+  if(!ids.length)return 0;
+  let vis=0;
+  for(const i of ids){ if(P[i]&&(P[i].visibility===undefined||P[i].visibility>=0.5)) vis++; }
+  return vis/ids.length;
 }
 
 let lastVideoTime=-1,smoothForm=0;
@@ -1073,8 +1075,8 @@ function phaseAlign(P,now){
   // jauge d'alignement visible pendant toute la phase (sauf compte à rebours)
   meter.classList.add('show');
   $('align-fill').style.width=Math.round(a*100)+'%';
-  $('align-lbl').textContent=a>=0.72?'✓':(Math.round(a*100)+'%');
-  if(a>=0.72){
+  $('align-lbl').textContent=a>=0.6?'✓':(Math.round(a*100)+'%');
+  if(a>=0.6){
     S.alignHold=(S.alignHold||0)+1;
     if(S.alignHold===1) say(L().voice.getReady,{force:true});
     const need=16;
