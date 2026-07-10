@@ -774,15 +774,15 @@ function pushupEngine(){
     const d=(wrY-shY)/sw; // amplitude verticale normalisée
     if(ds===null){ ds=d;dLo=d;dHi=d;
       return{form:35,msg:'push_down',dbg:{d:+d.toFixed(2),st:state,n:count,vis:vm,rng:0}}; }
-    // rejet des sauts aberrants (glitch MediaPipe) : un corps ne saute pas autant en 1 frame
-    const spikeLim=Math.max(1.2,(dHi-dLo)*1.5);
-    if(Math.abs(d-ds)>spikeLim)
+    // rejet des sauts aberrants (glitch MediaPipe) : plafond FIXE (une vraie pompe
+    // bouge d de < 1.5 / frame ; les glitchs sautent de 10+). +clamp valeurs absurdes.
+    if(Math.abs(d-ds)>1.8 || d>10 || d<-1)
       return{form:state==='down'?75:45,msg:state==='down'?'push_up':'push_down',
         dbg:{d:+ds.toFixed(2),st:state,n:count,vis:vm,rng:+(dHi-dLo).toFixed(2),skip:1}};
     ds=ds*0.5+d*0.5; warm++;
-    // enveloppe adaptative : suit la plage RÉCENTE et oublie les extrêmes anciens
-    if(ds>dHi)dHi=ds; else dHi-=(dHi-ds)*0.02;
-    if(ds<dLo)dLo=ds; else dLo+=(ds-dLo)*0.02;
+    // enveloppe adaptative : suit la plage RÉCENTE et oublie vite les extrêmes anciens
+    if(ds>dHi)dHi=ds; else dHi-=(dHi-ds)*0.04;
+    if(ds<dLo)dLo=ds; else dLo+=(ds-dLo)*0.04;
     const range=dHi-dLo;
     const dbg={d:+ds.toFixed(2),st:state,n:count,vis:vm,rng:+range.toFixed(2)};
     if(warm<15||range<0.15) return{form:35,msg:'push_down',dbg};
@@ -810,8 +810,8 @@ function punchEngine(){let armed={l:true,r:true},count=0;
     const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
     const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null;
     const dbg={eL:Math.round(eL),eR:Math.round(eR),dyL:+(P[15].y-P[11].y).toFixed(2),dyR:+(P[16].y-P[12].y).toFixed(2),n:count}; // calibrage
-    if(armed.l&&eL>140&&Math.abs(P[15].y-P[11].y)<0.33){armed.l=false;hit=eL;}
-    if(armed.r&&eR>140&&Math.abs(P[16].y-P[12].y)<0.33){armed.r=false;hit=eR;}
+    if(armed.l&&eL>140&&Math.abs(P[15].y-P[11].y)<0.28){armed.l=false;hit=eL;}
+    if(armed.r&&eR>140&&Math.abs(P[16].y-P[12].y)<0.28){armed.r=false;hit=eR;}
     if(eL<130)armed.l=true;if(eR<130)armed.r=true;
     if(hit){count++;const f=gs(hit,165,25);
       return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext',dbg:{...dbg,n:count}};}
