@@ -758,10 +758,10 @@ function punchEngine(){let armed={l:true,r:true},count=0;
     if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso'};
     const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
     const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null;
-    if(armed.l&&eL>158&&Math.abs(P[15].y-P[11].y)<0.18){armed.l=false;hit=eL;}
-    if(armed.r&&eR>158&&Math.abs(P[16].y-P[12].y)<0.18){armed.r=false;hit=eR;}
-    if(eL<120)armed.l=true;if(eR<120)armed.r=true;
-    if(hit){count++;const f=gs(hit,172,10);
+    if(armed.l&&eL>140&&Math.abs(P[15].y-P[11].y)<0.33){armed.l=false;hit=eL;}
+    if(armed.r&&eR>140&&Math.abs(P[16].y-P[12].y)<0.33){armed.r=false;hit=eR;}
+    if(eL<130)armed.l=true;if(eR<130)armed.r=true;
+    if(hit){count++;const f=gs(hit,165,25);
       return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext'};}
     return{form:guard,msg:'punch_guard'};}};}
 
@@ -781,10 +781,9 @@ const SPORTS=[
   {id:'pushup',em:'💥',unit:'reps',goal:60,
    name:{fr:'Pompes',en:'Push-ups',es:'Flexiones'},
    tip:{fr:'Téléphone au sol, vue de profil',en:'Phone on the floor, side view',es:'Teléfono en el suelo, vista lateral'},
-   make:()=>repEngine({need:[11,12,13,14,15,16,23,24,27,28],value:elbowAngle,downAt:95,upAt:155,
-     gate:P=>bodyLine(P)>140, gateMsg:'push_line', // corps tendu requis (anti "sur le flanc")
-     form:(P,v)=>{const d=gs(v,80,20),l=gs(bodyLine(P),178,14);return Math.round(d*.55+l*.45);},
-     coach:(P,v,st)=>bodyLine(P)<160?'push_line':(st==='down'?'push_up':'push_down')})},
+   make:()=>repEngine({need:[11,12,13,14,15,16],value:elbowAngle,downAt:110,upAt:150,
+     form:(P,v)=>{const d=gs(v,85,26),l=gs(bodyLine(P),178,22);return Math.round(d*.7+l*.3);},
+     coach:(P,v,st)=>st==='down'?'push_up':'push_down'})},
   {id:'lunge',em:'🚶',unit:'reps',goal:60,
    name:{fr:'Fentes',en:'Lunges',es:'Zancadas'},
    tip:{fr:'De profil, alterne les jambes',en:'Side view, alternate legs',es:'De perfil, alterna las piernas'},
