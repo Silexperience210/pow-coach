@@ -23,12 +23,12 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 - **Deux modes de retrait** :
   - **Lightning Address** (`nom@wallet.com`) → paiement **automatique et instantané**. L'adresse est mémorisée dans le compte.
   - **QR / LNURL-withdraw** → bon à scanner avec n'importe quel wallet.
-- **Faucet** : +1 sat/geste parfait, combos x5/x10/x21 (2/3/5 sats), +21 sats/objectif hebdo.
+- **Faucet** : +1 sat/geste parfait, combos x10/x21 (2/3 sats), +21 sats/objectif hebdo.
 - **📊 Stats** : reps totales, streak (jours consécutifs), % de gestes parfaits, graphique 7 jours (canvas maison), répartition par discipline.
 - **🏆 Leaderboard Nostr** : classement mondial par reps totales. Chaque athlète publie son score en note Nostr signée (kind 30078, tag `powcoach`, Schnorr BIP-340) sur plusieurs relays. Lecture agrégée en WebSocket brut, zéro backend.
 - **🎯 Défis hebdo partageables** : crée un défi (exercice + objectif), partage-le par **lien + image générée** (canvas 1080×1080, partage natif mobile). Le destinataire ouvre le lien → le défi s'importe automatiquement et sa progression se suit pendant les séances.
-- **Plafonds serveur** : max par retrait, budget global/jour, **et plafond par compte/jour** (anti-abus).
-- **Silhouette guide** + compte à rebours avant chaque exercice, jauge d'alignement.
+- **Plafonds serveur** : max par retrait, budget global/jour, cap/IP anti-abus, et **plafond d'earn par compte avec cooldown** : une fois `SERVER_DAILY_CAP` (200 sats) gagnés, les gains sont **bloqués `EARN_COOLDOWN_H` heures (18 par défaut)** puis le compteur repart à zéro — imposé de façon **atomique dans le Durable Object**.
+- **Silhouette guide pleine** (corps lumineux + schéma de mouvement animé : flèches, cible d'impact, anneau de tenue) + **départ « de face »** (se placer face à la caméra suffit à armer le compte à rebours) + jauge d'alignement.
 - Modèle **full** + lissage temporel + anti-rebond pour un comptage précis.
 
 ### 🌐 À propos du leaderboard Nostr
@@ -56,7 +56,8 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 | `ANON_DAILY_CAP` | Plaintext | `100` (cap/jour **par IP** quand non connecté ; défaut = `MAX_CLAIM_SATS`) |
 | `REQUIRE_AUTH` | Plaintext | `0` (ou `1` pour exiger la connexion) |
 | `SESSION_SECRET` | **Encrypt** 🔒 | secret HMAC des jetons de séance — active le **scoring serveur** (avec `LEDGER`) |
-| `SERVER_DAILY_CAP` | Plaintext | `200` (sats gagnables/jour/compte, scoring serveur) |
+| `SERVER_DAILY_CAP` | Plaintext | `200` (sats gagnables par fenêtre/compte avant cooldown, scoring serveur) |
+| `EARN_COOLDOWN_H` | Plaintext | `18` (heures de blocage des gains une fois `SERVER_DAILY_CAP` atteint ; puis remise à zéro) |
 
 ### KV (obligatoire pour l'auth + les budgets)
 
@@ -88,7 +89,7 @@ Puis **redeploy** (Deployments → Retry) pour appliquer variables et binding.
 | Abus anonyme (sans login) | ✔ `ANON_DAILY_CAP` par IP + fréquence mini (1 retrait / min / IP) |
 | Usurpation de compte | ✔ LNURL-auth : signature secp256k1 vérifiée serveur (testée), challenge à **usage unique** |
 | `amount` forgé / rejeu (devtools) | ✔ **Scoring serveur** (si activé) : séance signée HMAC à usage unique, le serveur **recalcule** les sats à partir du journal de reps et tient le **solde dans le DO** ; le montant client est ignoré |
-| Triche sur le comptage des reps | ⚠ La *détection de pose* reste côté client. Le scoring serveur filtre les logs implausibles (reps trop rapprochées, hors fenêtre) et borne l'earn/jour, mais ne **prouve** pas l'effort humain. Preuve forte = build **native + attestation** (Play Integrity), cf. roadmap. |
+| Triche sur le comptage des reps | ⚠ La *détection de pose* reste côté client. Le scoring serveur filtre les logs implausibles (reps trop rapprochées, hors fenêtre) et **borne l'earn (plafond `SERVER_DAILY_CAP` + cooldown `EARN_COOLDOWN_H`)**, mais ne **prouve** pas l'effort humain. Preuve forte = build **native + attestation** (Play Integrity), cf. roadmap. |
 
 > **Plafonnement strict (optionnel).** Par défaut les compteurs vivent en **KV**
 > (best-effort : sous très fort parallélisme ils peuvent légèrement se chevaucher).
