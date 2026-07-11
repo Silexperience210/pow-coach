@@ -22,5 +22,7 @@ export async function onRequestGet({ request, env }) {
   const session = await getSession(env, token);
   if (!session) return json({ server, balance: 0 }, 200, env);
   const r = await ledgerBalance(env, session.pubkey);
-  return json({ server, balance: r.balance || 0 }, 200, env);
+  const cap = parseInt(env.SERVER_DAILY_CAP || "200", 10);
+  return json({ server, balance: r.balance || 0,
+    earned: r.earned || 0, cap, lockUntil: r.lockUntil || 0 }, 200, env);
 }

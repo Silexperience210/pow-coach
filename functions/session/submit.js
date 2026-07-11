@@ -34,12 +34,15 @@ export async function onRequestPost({ request, env }) {
 
   const { valid, sats } = validateRepLog(env, st.exId, st.startTs, now, body.reps);
 
-  const day = new Date().toISOString().slice(0, 10);
-  const dayCap = parseInt(env.SERVER_DAILY_CAP || "200", 10); // plafond d'earn/jour/compte
-  const r = await ledgerCredit(env, { sid: st.sid, pubkey: session.pubkey, amount: sats, day, dayCap });
+  // plafond d'earn par fenêtre + COOLDOWN : au-delà de SERVER_DAILY_CAP sats,
+  // verrou de EARN_COOLDOWN_H heures (défaut 18) avant de pouvoir regagner.
+  const cap = parseInt(env.SERVER_DAILY_CAP || "200", 10);
+  const cooldownMs = Math.round(parseFloat(env.EARN_COOLDOWN_H || "18") * 3600 * 1000);
+  const r = await ledgerCredit(env, { sid: st.sid, pubkey: session.pubkey, amount: sats, cap, cooldownMs });
   if (!r.ok) {
     if (r.reason === "replay") return json({ error: "Séance déjà validée" }, 409, env);
     return json({ error: "Crédit refusé" }, 400, env);
   }
-  return json({ credited: r.credited, balance: r.balance, valid }, 200, env);
+  return json({ credited: r.credited, balance: r.balance, valid,
+    earned: r.earned, cap: r.cap, lockUntil: r.lockUntil, locked: r.locked }, 200, env);
 }

@@ -88,27 +88,39 @@ export class Ledger {
   }
 
   /* ---- solde par compte (sats gagnés, vérifiés côté serveur) ----
-     bal:<pubkey> est PERSISTANT (jamais purgé). Le crédit est plafonné par le
-     cap d'earn/jour et la session (sid) est à usage unique (anti-rejeu). */
-  async credit({ sid, pubkey, amount, day, dayCap }) {
+     bal:<pubkey> est PERSISTANT (jamais purgé). L'earn est plafonné par `cap`
+     (sats gagnables par fenêtre) avec COOLDOWN : dès que le cumul atteint `cap`,
+     un verrou de `cooldownMs` bloque tout gain ; à son expiration le compteur
+     repart à 0. État : earn:<pubkey> = { earned, lockUntil, ts }. La session
+     (sid) reste à usage unique (anti-rejeu). */
+  async credit({ sid, pubkey, amount, cap, cooldownMs }) {
     const amt = Math.floor(Number(amount));
     if (!pubkey || !Number.isFinite(amt) || amt < 0) return json({ ok: false, reason: "bad" });
+    const capN = Math.floor(Number(cap)) || 0;
+    const cd = Math.max(0, Math.floor(Number(cooldownMs)) || 0);
     return await this.storage.transaction(async (txn) => {
       if (sid && (await txn.get("used:" + sid))) return json({ ok: false, reason: "replay" });
-      const cap = Math.floor(Number(dayCap)) || 0;
-      let grant = amt;
-      if (cap > 0) {
-        const ek = `c:earned:${pubkey}:${day}`;
-        const earned = (await txn.get(ek)) || 0;
-        grant = Math.max(0, Math.min(amt, cap - earned));
-        if (grant > 0) await txn.put(ek, earned + grant);
+      const now = Date.now();
+      const ek = "earn:" + pubkey;
+      let st = (await txn.get(ek)) || { earned: 0, lockUntil: 0 };
+      if (st.lockUntil && now >= st.lockUntil) st = { earned: 0, lockUntil: 0 }; // fenêtre expirée → reset
+      let grant = amt, locked = false;
+      if (capN > 0) {
+        if (st.lockUntil && now < st.lockUntil) { grant = 0; locked = true; } // verrouillé
+        else {
+          grant = Math.max(0, Math.min(amt, capN - st.earned));
+          st.earned += grant;
+          if (st.earned >= capN) { st.lockUntil = now + cd; locked = true; } // plafond atteint → verrou
+        }
       }
+      st.ts = now;
+      await txn.put(ek, st);
       const balKey = "bal:" + pubkey;
       const bal = ((await txn.get(balKey)) || 0) + grant;
-      await txn.put(balKey, bal);
-      if (sid) await txn.put("used:" + sid, Date.now());
-      if (!(await this.storage.getAlarm())) await this.storage.setAlarm(Date.now() + DAY);
-      return json({ ok: true, credited: grant, balance: bal });
+      if (grant > 0) await txn.put(balKey, bal);
+      if (sid) await txn.put("used:" + sid, now);
+      if (!(await this.storage.getAlarm())) await this.storage.setAlarm(now + DAY);
+      return json({ ok: true, credited: grant, balance: bal, earned: st.earned, cap: capN, lockUntil: st.lockUntil || 0, locked });
     });
   }
 
@@ -136,7 +148,14 @@ export class Ledger {
   }
 
   async balance({ pubkey }) {
-    return json({ balance: (await this.storage.get("bal:" + pubkey)) || 0 });
+    const now = Date.now();
+    let st = (await this.storage.get("earn:" + pubkey)) || { earned: 0, lockUntil: 0 };
+    if (st.lockUntil && now >= st.lockUntil) st = { earned: 0, lockUntil: 0 }; // fenêtre expirée
+    return json({
+      balance: (await this.storage.get("bal:" + pubkey)) || 0,
+      earned: st.earned || 0,
+      lockUntil: st.lockUntil || 0,
+    });
   }
 
   // purge : compteurs de jours révolus (>3 j), rate-limits (>1 h), sessions (>1 j)
@@ -154,6 +173,11 @@ export class Ledger {
     const used = await this.storage.list({ prefix: "used:" });
     for (const [key, ts] of used) {
       if (now - ts > DAY) await this.storage.delete(key);
+    }
+    // compteurs d'earn inactifs > 7 j (le solde bal: est conservé à part)
+    const earns = await this.storage.list({ prefix: "earn:" });
+    for (const [key, st] of earns) {
+      if (st && st.ts && now - st.ts > 7 * DAY) await this.storage.delete(key);
     }
     await this.storage.setAlarm(now + DAY);
   }

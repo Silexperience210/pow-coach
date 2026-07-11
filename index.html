@@ -22,9 +22,8 @@ window.POW_CONFIG = Object.freeze({
   REQUIRE_AUTH: false,         // true = connexion LNURL-auth obligatoire pour gagner/retirer
   SATS_PERFECT: 1,             // sats par geste parfait
   COMBO_TIERS: [               // paliers de combo (gestes parfaits consécutifs)
-    { at: 5,  sats: 2 },       // à partir de x5 : 2 sats / geste parfait
-    { at: 10, sats: 3 },
-    { at: 21, sats: 5 }
+    { at: 10, sats: 2 },       // à partir de x10 : 2 sats / geste parfait (moins généreux)
+    { at: 21, sats: 3 }
   ],
   SATS_WEEKLY_GOAL: 21,        // bonus quand un objectif hebdo est atteint
   PERFECT_THRESHOLD: 92,       // % de forme minimum pour "parfait"
@@ -518,7 +517,7 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   chalShareText:(t,e)=>`Je te défie : ${t} ${e} cette semaine sur PoW Coach ⚡`,
   chalImgTitle:"DÉFI DE LA SEMAINE", chalImgSub:"Relève-le sur PoW Coach ⚡",
   noSats:"Aucun sat à réclamer — au boulot ! 💪", minClaim:(n)=>`Minimum ${n} sats pour réclamer`, notCfg:"⚠ Faucet non configuré par le propriétaire",
-  capHit:"Plafond journalier atteint — reviens demain ⚡", err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
+  capHit:"Plafond journalier atteint — reviens demain ⚡", capLock:(t)=>`Plafond de sats atteint 🔒 reviens dans ${t}`, err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
   loading:"⚡ Chargement du modèle IA…", alignPose:"Prends la position (imite la silhouette)", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
   combo:"COMBO", comboBroken:"COMBO PERDU",
@@ -555,7 +554,7 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   chalShareText:(t,e)=>`I challenge you: ${t} ${e} this week on PoW Coach ⚡`,
   chalImgTitle:"CHALLENGE OF THE WEEK", chalImgSub:"Take it on PoW Coach ⚡",
   noSats:"No sats to claim — get to work! 💪", minClaim:(n)=>`Minimum ${n} sats to claim`, notCfg:"⚠ Faucet not configured by owner",
-  capHit:"Daily cap reached — come back tomorrow ⚡", err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
+  capHit:"Daily cap reached — come back tomorrow ⚡", capLock:(t)=>`Sats cap reached 🔒 come back in ${t}`, err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
   loading:"⚡ Loading AI model…", alignPose:"Get into position (match the silhouette)", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
   combo:"COMBO", comboBroken:"COMBO LOST",
@@ -592,7 +591,7 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   chalShareText:(t,e)=>`Te reto: ${t} ${e} esta semana en PoW Coach ⚡`,
   chalImgTitle:"RETO DE LA SEMANA", chalImgSub:"Acéptalo en PoW Coach ⚡",
   noSats:"Sin sats que reclamar — ¡a entrenar! 💪", minClaim:(n)=>`Mínimo ${n} sats para reclamar`, notCfg:"⚠ Faucet no configurado por el propietario",
-  capHit:"Límite diario alcanzado — vuelve mañana ⚡", err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
+  capHit:"Límite diario alcanzado — vuelve mañana ⚡", capLock:(t)=>`Límite de sats alcanzado 🔒 vuelve en ${t}`, err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
   loading:"⚡ Cargando modelo IA…", alignPose:"Ponte en posición (imita la silueta)", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
   combo:"COMBO", comboBroken:"COMBO PERDIDO",
@@ -630,7 +629,7 @@ const S={ lang:store.get('powlang','fr'), voice:store.get('powvoice',true),
   facing:'user', running:false, landmarker:null, ctx:null, drawer:null,
   ex:null, engine:null, combo:0, comboTier:0, sessionSats:0, lastLnurl:'', lastVoice:0,
   loginK1:'', loginTimer:null, tab:'train',
-  repLog:[], wsToken:null, serverMode:false,
+  repLog:[], wsToken:null, serverMode:false, lockUntil:0,
   cal:(location.search.indexOf('cal=1')>=0||location.hash.indexOf('cal')>=0) };
 const L=()=>I18N[S.lang];
 const API=()=>CFG.API_BASE||''; // même origine si vide
@@ -638,13 +637,18 @@ const API=()=>CFG.API_BASE||''; // même origine si vide
 /* ---------- solde serveur (scoring vérifié côté serveur) ----------
    Si le backend a le DO + SESSION_SECRET, /balance renvoie server:true et le
    solde fait autorité côté serveur. Sinon on reste en mode legacy (solde local). */
+// verrou d'earn (cooldown après plafond) : ms restantes avant de pouvoir regagner
+function earnLockLeft(){ return S.lockUntil ? Math.max(0, S.lockUntil - Date.now()) : 0; }
+function fmtDur(ms){ const m=Math.ceil(ms/60000); if(m<60)return m+' min';
+  const h=Math.floor(m/60), mm=m%60; return mm?`${h}h${String(mm).padStart(2,'0')}`:`${h}h`; }
 async function refreshBalance(){
   try{
     const q=S.token?('?token='+encodeURIComponent(S.token)):'';
     const r=await fetch(API()+'/balance'+q);
     const d=await r.json();
     S.serverMode=!!d.server;
-    if(S.serverMode && S.token){ S.balance=d.balance||0; store.set('powbalance',S.balance); if(typeof renderHome==='function')renderHome(); }
+    if(S.serverMode && S.token){ S.balance=d.balance||0; store.set('powbalance',S.balance);
+      S.lockUntil=d.lockUntil||0; if(typeof renderHome==='function')renderHome(); }
   }catch(e){}
 }
 // démarre une séance notée serveur (jeton signé). Sans connexion → pas de scoring serveur.
@@ -666,7 +670,9 @@ async function submitServerSession(){
       body:JSON.stringify({sessionId:tok,reps:log,token:S.token})});
     const d=await r.json();
     if(typeof d.balance==='number'){S.balance=d.balance;store.set('powbalance',S.balance);renderHome();}
+    if(typeof d.lockUntil==='number')S.lockUntil=d.lockUntil;
     if(d.credited>0)toast('+'+d.credited+' ⚡ '+(L().credited||'validés'));
+    if(d.locked&&earnLockLeft()>0)toast(L().capLock(fmtDur(earnLockLeft()))); // plafond atteint → cooldown
   }catch(e){}
 }
 const DEFAULT_RELAYS=['wss://relay.damus.io','wss://nos.lol','wss://relay.primal.net','wss://nostr.bitcoiner.social'];
@@ -1149,6 +1155,8 @@ let lastVideoTime=-1,smoothForm=0;
 const GROUND_EX=['pushup','plank','bridge']; // téléphone au sol → caméra arrière
 async function startWorkout(exId){
   ensureWeek();ensureDay();
+  // cooldown : plafond de sats atteint → aucune séance rémunérée avant expiration
+  if(S.serverMode && S.token && earnLockLeft()>0){ toast(L().capLock(fmtDur(earnLockLeft()))); return; }
   S.ex=findEx(exId);S.engine=S.ex.make();S.combo=0;S.comboTier=0;S.sessionSats=0;
   S.phase='align';S.countdown=0;smoothLM=null;S.alignHold=0;S.cdStarted=false;
   startServerSession(exId); // ouvre la séance notée serveur (si connecté + serverMode)
