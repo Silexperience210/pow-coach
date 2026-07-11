@@ -277,6 +277,11 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
 .faucet-info .box{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
 .faucet-info .box b{display:block;font-family:'Chakra Petch',monospace;font-size:17px;color:var(--acc)}
 .faucet-info .box span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.tip-link{width:100%;margin:2px 0 8px;background:transparent;border:1px dashed var(--line);color:var(--acc2);
+  border-radius:12px;padding:9px;font-size:12.5px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:border-color .15s}
+.tip-link:hover{border-color:var(--acc2)}
+.tip-addr{font-family:'Chakra Petch',monospace;font-size:14px;color:var(--acc);word-break:break-all;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;margin:8px 0;cursor:pointer;text-align:center}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -309,6 +314,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
       <div class="box"><b id="fi-combo">x5</b><span id="fi-combo-l"></span></div>
       <div class="box"><b id="fi-goal">+21</b><span id="fi-goal-l"></span></div>
     </div>
+    <button class="tip-link" id="tip-link" onclick="openTip()">💛 Support the project — send a tip ⚡</button>
     <div class="section-title" id="st-sports"></div>
     <div class="grid" id="sports-grid"></div>
     <div class="section-title" id="st-goals"></div>
@@ -481,6 +487,21 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     <div class="wk-actions">
       <button class="btn-ghost" onclick="cancelLogin()" id="login-cancel"></button>
       <button class="btn-acc" onclick="copyLoginLnurl()" id="login-copy"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SUPPORT / TIP (message engageant EN) ============ -->
+<div class="modal" id="modal-tip">
+  <div class="sheet">
+    <div class="reward-title">💛 Enjoying PoW Coach?</div>
+    <p class="reward-sub">This faucet pays you <b>real Bitcoin</b> just for moving your body — no ads, no signup, no catch. If it's helping you train, a few sats keep the rewards flowing and the lights on. Zap the project ⚡ — every sat counts. 🙏</p>
+    <div id="tip-qrbox" style="cursor:pointer" onclick="openTipWallet()"></div>
+    <div class="tip-addr" id="tip-addr" onclick="copyTip()">tips_pow_coach@21pay.org</div>
+    <a class="btn-acc" id="tip-open" href="#" style="display:block;text-align:center;margin:4px 0 8px;padding:12px;border-radius:12px">⚡ Open in wallet</a>
+    <div class="wk-actions">
+      <button class="btn-ghost" onclick="closeModal('modal-tip')">Maybe later</button>
+      <button class="btn-acc" onclick="copyTip()">Copy address</button>
     </div>
   </div>
 </div>
@@ -1441,6 +1462,28 @@ window.startLogin=async()=>{
 window.cancelLogin=()=>{ if(S.loginTimer)clearInterval(S.loginTimer); closeModal('modal-login'); };
 window.copyLoginLnurl=async()=>{ try{await navigator.clipboard.writeText(S.lastLoginLnurl);toast(L().copied);}catch(e){toast(L().copyFail);} };
 window.openLoginWallet=()=>{ if(S.lastLoginLnurl) window.location.href='lightning:'+S.lastLoginLnurl; };
+
+/* ---------- Soutien / pourboire (tip jar) ----------
+   Adresse Lightning du projet. Popup engageante toutes les 3 h d'usage ACTIF
+   (jamais pendant une séance ni par-dessus un autre modal), + lien permanent. */
+const TIP_LNADDR='tips_pow_coach@21pay.org';
+const TIP_EVERY_MS=3*3600*1000;
+let tipQRDone=false;
+window.openTip=()=>{
+  const box=$('tip-qrbox');
+  if(!tipQRDone && box && window.QRCode){ try{ new QRCode(box,{text:TIP_LNADDR,width:200,height:200,correctLevel:QRCode.CorrectLevel.M}); tipQRDone=true; }catch(e){} }
+  $('tip-open').href='lightning:'+TIP_LNADDR;
+  $('modal-tip').classList.add('show');
+};
+window.openTipWallet=()=>{ window.location.href='lightning:'+TIP_LNADDR; };
+window.copyTip=async()=>{ try{ await navigator.clipboard.writeText(TIP_LNADDR); toast('📋 '+TIP_LNADDR); }catch(e){ toast('Copy failed'); } };
+function tipTick(){
+  if(document.visibilityState!=='visible')return;
+  let used=(+store.get('powtipused',0))+60000;
+  store.set('powtipused',used);
+  if(used>=TIP_EVERY_MS && !S.running && !document.querySelector('.modal.show')){ store.set('powtipused',0); openTip(); }
+}
+setInterval(tipTick,60000);
 
 /* =========================================================
    RETRAIT — Lightning Address (auto) ou LNURL-withdraw (QR)
