@@ -29,8 +29,8 @@ self.addEventListener('fetch', (e) => {
   if (sameOrigin && /^\/(claim|session|balance|auth|faucet)(\/|$)/.test(url.pathname)) return;
   // gros modèle MediaPipe : réseau direct, pas de cache
   if (/\.task(\?|$)/.test(url.pathname)) return;
-  // tuiles OpenStreetMap : réseau direct (évite de saturer le cache pendant une course)
-  if (url.hostname === 'tile.openstreetmap.org') return;
+  // tuiles carto (CARTO dark / OSM) : réseau direct (évite de saturer le cache pendant une course)
+  if (url.hostname === 'tile.openstreetmap.org' || url.hostname.endsWith('basemaps.cartocdn.com')) return;
 
   // navigation : réseau d'abord, repli cache
   if (req.mode === 'navigate') {
