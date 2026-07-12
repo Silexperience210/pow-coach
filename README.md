@@ -28,6 +28,9 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 - **🏆 Leaderboard Nostr** : classement mondial par reps totales. Chaque athlète publie son score en note Nostr signée (kind 30078, tag `powcoach`, Schnorr BIP-340) sur plusieurs relays. Lecture agrégée en WebSocket brut, zéro backend.
 - **🎯 Défis hebdo partageables** : crée un défi (exercice + objectif), partage-le par **lien + image générée** (canvas 1080×1080, partage natif mobile). Le destinataire ouvre le lien → le défi s'importe automatiquement et sa progression se suit pendant les séances.
 - **💛 Soutien / tips** : lien permanent « Support the project » + rappel discret toutes les **3 h d'usage actif** (jamais pendant une séance), avec QR et bouton *open in wallet*, vers l'adresse Lightning du projet — **séparée du wallet faucet**. (adresse dans `TIP_LNADDR`, fréquence dans `TIP_EVERY_MS`)
+- **📲 PWA installable** : `manifest.json` + service worker → « Ajouter à l'écran d'accueil », icône, plein écran, chargement instantané et tolérant au réseau (l'API n'est jamais mise en cache, le modèle de pose non plus). Bouton *Install* quand disponible.
+- **🚱 Bannière faucet** : quand le wallet faucet est bientôt vide (`low`) ou trop bas pour payer (`dry`), une bannière l'indique (utilisateurs **et** propriétaire). L'endpoint `GET /faucet` ne renvoie que des booléens (pas le solde exact). Un **pré-check** refuse proprement un retrait impossible au lieu d'une erreur brute.
+- **👋 Onboarding** : court écran d'accueil à la 1re visite (FR/EN/ES) expliquant gagner / connecter un wallet / retirer.
 - **Plafonds serveur** : max par retrait, budget global/jour, cap/IP anti-abus, et **plafond d'earn par compte avec cooldown** : une fois `SERVER_DAILY_CAP` (200 sats) gagnés, les gains sont **bloqués `EARN_COOLDOWN_H` heures (18 par défaut)** puis le compteur repart à zéro — imposé de façon **atomique dans le Durable Object**.
 - **Silhouette guide pleine** (corps lumineux + schéma de mouvement animé : flèches, cible d'impact, anneau de tenue) + **départ « de face »** (se placer face à la caméra suffit à armer le compte à rebours) + jauge d'alignement.
 - Modèle **full** + lissage temporel + anti-rebond pour un comptage précis.
@@ -59,6 +62,8 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 | `SESSION_SECRET` | **Encrypt** 🔒 | secret HMAC des jetons de séance — active le **scoring serveur** (avec `LEDGER`) |
 | `SERVER_DAILY_CAP` | Plaintext | `200` (sats gagnables par fenêtre/compte avant cooldown, scoring serveur) |
 | `EARN_COOLDOWN_H` | Plaintext | `18` (heures de blocage des gains une fois `SERVER_DAILY_CAP` atteint ; puis remise à zéro) |
+| `MIN_CLAIM_SATS` | Plaintext | `10` (seuil `dry` de `/faucet` : sous ce solde le faucet ne peut plus payer) |
+| `FAUCET_LOW_SATS` | Plaintext | `50` (seuil `low` de `/faucet` : bannière « bientôt vide ») |
 
 ### KV (obligatoire pour l'auth + les budgets)
 
@@ -91,6 +96,9 @@ Puis **redeploy** (Deployments → Retry) pour appliquer variables et binding.
 | Usurpation de compte | ✔ LNURL-auth : signature secp256k1 vérifiée serveur (testée), challenge à **usage unique** |
 | `amount` forgé / rejeu (devtools) | ✔ **Scoring serveur** (si activé) : séance signée HMAC à usage unique, le serveur **recalcule** les sats à partir du journal de reps et tient le **solde dans le DO** ; le montant client est ignoré |
 | Triche sur le comptage des reps | ⚠ La *détection de pose* reste côté client. Le scoring serveur filtre les logs implausibles (reps trop rapprochées, hors fenêtre) et **borne l'earn (plafond `SERVER_DAILY_CAP` + cooldown `EARN_COOLDOWN_H`)**, mais ne **prouve** pas l'effort humain. Preuve forte = build **native + attestation** (Play Integrity), cf. roadmap. |
+| Spam des séances (`/session/*`) | ✔ Rate-limit best-effort par IP (KV) sur `start` et `submit` |
+| Faucet à sec / paiements ratés | ✔ Pré-check du solde du wallet avant de promettre un retrait + bannière `dry`/`low` |
+| Dépendance CDN compromise | ✔ qrcodejs **auto-hébergé** (`vendor/`), CSP resserrée ; MediaPipe + noble restent des imports ES **épinglés** (SRI non applicable aux imports de modules) |
 
 > **Plafonnement strict (optionnel).** Par défaut les compteurs vivent en **KV**
 > (best-effort : sous très fort parallélisme ils peuvent légèrement se chevaucher).
