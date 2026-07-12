@@ -861,43 +861,43 @@ function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
         return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count,vis:vm}};}
       if(v>o.upAt)state='up';}
     return{form,msg,dbg};}};}
-/* Pompe vue de FACE : les mains sont fixes au sol, la tête/épaules montent et
-   descendent. On mesure l'AMPLITUDE verticale épaules→mains, normalisée par la
-   largeur d'épaules (invariant échelle/distance). Auto-calibrage : on apprend
-   l'amplitude de la personne et on compte une rep quand elle descend puis remonte.
-   N'utilise QUE épaules(11,12) + poignets(15,16) → pas besoin des coudes que
-   MediaPipe perd en position basse. */
+/* Pompe vue de FACE : amplitude verticale épaules→poignets, normalisée par la
+   largeur d'épaules. Calibré sur données réelles (2026-07-12) :
+   - vraie pompe : d descend de ~0.85 (haut) à ~0.15 (poitrine au sol), vis 0.9+
+   - fausse (tête seule / debout) : d reste 0.5–0.8 (petite amplitude) OU vis basse
+   Anti-faux-positifs : (1) GATE visibilité strict (épaules+poignets ≥ 0.55, sinon
+   MediaPipe invente les positions et elles gigotent), (2) seuils FIXES exigeant une
+   VRAIE descente profonde (deepest < DEEP) avant de compter, (3) rejet des glitchs
+   (saut d > 0.6/frame), (4) 1 rep / 1.2 s max. */
 function pushupEngine(){
-  let count=0,state='up',lastRep=0,ds=null,dLo=0,dHi=0,warm=0,deepest=Infinity;
-  const MIN_MS=550,need=[11,12,15,16];
+  let count=0,state='up',lastRep=0,ds=null,warm=0,deepest=9;
+  const MIN_MS=1200,need=[11,12,15,16],VMIN=0.55;
+  const DOWN=0.42, UP=0.68, DEEP=0.32; // seuils fixes (amplitude normalisée)
   return{type:'reps',count:()=>count,analyze(P){
     const vm=+visMinOf(P,need).toFixed(2);
-    if(!(P[11]&&P[12]&&P[15]&&P[16])) return{form:null,msg:'frame',dbg:{vis:vm}};
+    // (1) gate visibilité : épaules + poignets BIEN vus, sinon on ne compte rien
+    const seen=need.every(i=>P[i]&&(P[i].visibility===undefined||P[i].visibility>=VMIN));
+    if(!seen){ state='up'; ds=null; return{form:null,msg:'frame',dbg:{vis:vm,st:'wait',n:count}}; }
     const shY=(P[11].y+P[12].y)/2, wrY=(P[15].y+P[16].y)/2;
     const sw=Math.hypot(P[11].x-P[12].x,P[11].y-P[12].y)||1e-3;
-    const d=(wrY-shY)/sw; // amplitude verticale normalisée
-    if(ds===null){ ds=d;dLo=d;dHi=d;
-      return{form:35,msg:'push_down',dbg:{d:+d.toFixed(2),st:state,n:count,vis:vm,rng:0}}; }
-    // rejet des sauts aberrants (glitch MediaPipe) : plafond FIXE (une vraie pompe
-    // bouge d de < 1.5 / frame ; les glitchs sautent de 10+). +clamp valeurs absurdes.
-    if(Math.abs(d-ds)>1.8 || d>10 || d<-1)
-      return{form:state==='down'?75:45,msg:state==='down'?'push_up':'push_down',
-        dbg:{d:+ds.toFixed(2),st:state,n:count,vis:vm,rng:+(dHi-dLo).toFixed(2),skip:1}};
-    ds=ds*0.5+d*0.5; warm++;
-    // enveloppe adaptative : suit la plage RÉCENTE et oublie vite les extrêmes anciens
-    if(ds>dHi)dHi=ds; else dHi-=(dHi-ds)*0.04;
-    if(ds<dLo)dLo=ds; else dLo+=(ds-dLo)*0.04;
-    const range=dHi-dLo;
-    const dbg={d:+ds.toFixed(2),st:state,n:count,vis:vm,rng:+range.toFixed(2)};
-    if(warm<15||range<0.15) return{form:35,msg:'push_down',dbg};
-    const lo=dLo+range*0.35, hi=dHi-range*0.35, now=performance.now();
-    if(state==='up'){ if(ds<lo){state='down';deepest=ds;} }
+    const d=(wrY-shY)/sw;
+    if(ds===null){ ds=d; warm=0; deepest=9;
+      return{form:40,msg:'push_down',dbg:{d:+d.toFixed(2),st:state,n:count,vis:vm}}; }
+    // (3) rejet glitch : une vraie pompe bouge d de < 0.2/frame ; on jette les sauts
+    if(Math.abs(d-ds)>0.6 || d>3 || d<-0.5)
+      return{form:state==='down'?70:40,msg:state==='down'?'push_up':'push_down',
+        dbg:{d:+ds.toFixed(2),st:state,n:count,vis:vm,skip:1}};
+    ds=ds*0.6+d*0.4; warm++;
+    const now=performance.now(), dbg={d:+ds.toFixed(2),dp:+deepest.toFixed(2),st:state,n:count,vis:vm};
+    if(warm<6) return{form:40,msg:'push_down',dbg};
+    if(state==='up'){ if(ds<DOWN){ state='down'; deepest=ds; } }
     else { deepest=Math.min(deepest,ds);
-      if(ds>hi&&now-lastRep>MIN_MS){ state='up';lastRep=now;count++;
-        const depth=(dHi-deepest)/(range||1);
-        const f=Math.round(Math.max(50,Math.min(100,depth*110+10)));
-        return{rep:true,repForm:f,form:f,msg:'push_up',dbg}; } }
-    return{form:state==='down'?75:45,msg:state==='down'?'push_up':'push_down',dbg};
+      if(ds>UP){ // remontée
+        if(deepest<DEEP && now-lastRep>MIN_MS){ state='up'; lastRep=now; count++;
+          const f=Math.round(55+Math.max(0,Math.min(1,(0.5-deepest)/0.4))*45);
+          return{rep:true,repForm:f,form:f,msg:'push_up',dbg:{...dbg,st:'up',n:count}}; }
+        state='up'; } } // remonté sans vraie descente → pas de rep
+    return{form:state==='down'?70:40,msg:state==='down'?'push_up':'push_down',dbg};
   }};
 }
 function holdEngine(o){let sec=0,last=null;
