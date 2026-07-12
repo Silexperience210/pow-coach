@@ -295,6 +295,7 @@ export const ledgerRefund = (env, decrements) => ledgerCall(env, "/refund", { de
 export const ledgerCredit = (env, p) => ledgerCall(env, "/credit", p);
 export const ledgerDebit = (env, pubkey, amount) => ledgerCall(env, "/debit", { pubkey, amount });
 export const ledgerBalance = (env, pubkey) => ledgerCall(env, "/balance", { pubkey });
+export const ledgerSpent = (env, day) => ledgerCall(env, "/spent", { day });
 export const ledgerRefundBalance = (env, pubkey, amount) => ledgerCall(env, "/refund-balance", { pubkey, amount }).catch(() => {});
 
 // construit la liste des plafonds à vérifier pour cette demande

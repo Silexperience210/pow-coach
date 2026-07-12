@@ -37,6 +37,7 @@ export class Ledger {
     if (url.pathname === "/debit") return this.debit(body);
     if (url.pathname === "/balance") return this.balance(body);
     if (url.pathname === "/refund-balance") return this.refundBalance(body);
+    if (url.pathname === "/spent") return this.spentInfo(body);
     return new Response("not found", { status: 404 });
   }
 
@@ -145,6 +146,11 @@ export class Ledger {
       await txn.put(balKey, bal);
       return json({ ok: true, balance: bal });
     });
+  }
+
+  // transparence : total distribué aujourd'hui (compteur budget global, lecture seule)
+  async spentInfo({ day }) {
+    return json({ spent: (await this.storage.get("c:spent:" + day)) || 0 });
   }
 
   async balance({ pubkey }) {

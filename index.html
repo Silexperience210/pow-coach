@@ -292,6 +292,19 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
 .faucet-banner{background:color-mix(in srgb,var(--hot) 16%,var(--panel));border:1px solid var(--hot);color:var(--hot);
   border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:13px;font-weight:600;text-align:center}
 .faucet-banner.low{background:color-mix(in srgb,var(--acc2) 12%,var(--panel));border-color:var(--acc2);color:var(--acc2)}
+.diff-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 12px}
+.diff-row .diff-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.seg{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:none;background:transparent;color:var(--dim);font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer}
+.seg button.on{background:var(--acc);color:#08110d}
+.claim-item{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:7px;font-size:13px}
+.claim-item .amt{font-family:'Chakra Petch',monospace;color:var(--acc);font-weight:700}
+.claim-item .meta{color:var(--dim);font-size:11px}
+.transp-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font-size:13px;color:var(--acc2)}
+.transp-card .bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:8px}
+.transp-card .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--grn))}
+.board-row .zap{background:transparent;border:1px solid var(--acc2);color:var(--acc2);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer;margin-left:8px}
+.board-row .zap:active{background:var(--acc2);color:#08110d}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -327,6 +340,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     </div>
     <button class="tip-link" id="tip-link" onclick="openTip()">💛 Support the project — send a tip ⚡</button>
     <button class="tip-link" id="install-btn" onclick="installApp()" style="display:none">📲 Install PoW Coach — add to home screen</button>
+    <div class="diff-row"><span class="diff-label" id="diff-label"></span><div class="seg" id="diff-seg"></div></div>
+    <button class="tip-link" id="rest-btn" onclick="openRest()">⏱ <span id="rest-btn-l"></span></button>
     <div class="section-title" id="st-sports"></div>
     <div class="grid" id="sports-grid"></div>
     <div class="section-title" id="st-goals"></div>
@@ -346,6 +361,10 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     <div class="chartcard"><canvas id="chart7" height="150"></canvas></div>
     <div class="section-title" id="st-bydisc"></div>
     <div id="disc-bars"></div>
+    <div class="section-title" id="st-claims"></div>
+    <div id="claims-list"></div>
+    <div class="section-title" id="st-transp"></div>
+    <div class="transp-card" id="transp-card"></div>
   </div>
 
   <div class="tabview" id="tab-board" style="display:none">
@@ -527,6 +546,16 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
   </div>
 </div>
 
+<!-- ============ MINUTEUR DE REPOS ============ -->
+<div class="modal" id="modal-rest">
+  <div class="sheet" style="text-align:center">
+    <div class="reward-title" id="rest-title"></div>
+    <div id="rest-count" style="font-family:'Chakra Petch',monospace;font-size:64px;color:var(--acc);margin:8px 0">--</div>
+    <div class="seg" id="rest-presets" style="justify-content:center;width:max-content;margin:0 auto 12px"></div>
+    <div class="wk-actions"><button class="btn-ghost" onclick="stopRest()" id="rest-skip" style="width:100%"></button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -562,6 +591,11 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   capHit:"Plafond journalier atteint — reviens demain ⚡", capLock:(t)=>`Plafond de sats atteint 🔒 reviens dans ${t}`,
   introTitle:"⚡ Bienvenue sur PoW Coach", introBody:"Bouge ton corps, gagne des sats. La caméra compte tes répétitions et te récompense en vrais bitcoins ⚡. Connecte un wallet Lightning (bouton 👤) pour gagner et retirer. Gratuit, sans pub, sans inscription.", introGo:"C'est parti 💪",
   faucetDry:"⚡ Faucet momentanément à sec — reviens bientôt 🙏", faucetLow:"⚡ Faucet bientôt vide",
+  diffLabel:"Difficulté", diffEasy:"Facile", diffNormal:"Normal", diffHard:"Difficile",
+  restBtn:"Minuteur de repos", restTitle:"Repos", restSkip:"Terminer", restDone:"Repos terminé — go ! 💪",
+  statClaims:"Derniers retraits", claimsEmpty:"Aucun retrait pour l'instant", claimQr:"QR",
+  statTransp:"Transparence du faucet", transpEmpty:"Indisponible", transpToday:(a,b)=>`Distribué aujourd'hui : ${a}${b?(' / '+b):''} sats`,
+  zapTip:"Zap cet athlète ⚡",
   err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
   loading:"⚡ Chargement du modèle IA…", alignPose:"Prends la position (imite la silhouette)", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
@@ -602,6 +636,11 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   capHit:"Daily cap reached — come back tomorrow ⚡", capLock:(t)=>`Sats cap reached 🔒 come back in ${t}`,
   introTitle:"⚡ Welcome to PoW Coach", introBody:"Move your body, earn sats. The camera counts your reps and rewards you in real Bitcoin ⚡. Connect a Lightning wallet (👤 button) to earn and withdraw. Free, no ads, no signup.", introGo:"Let's go 💪",
   faucetDry:"⚡ Faucet temporarily dry — come back soon 🙏", faucetLow:"⚡ Faucet running low",
+  diffLabel:"Difficulty", diffEasy:"Easy", diffNormal:"Normal", diffHard:"Hard",
+  restBtn:"Rest timer", restTitle:"Rest", restSkip:"Done", restDone:"Rest over — go! 💪",
+  statClaims:"Recent withdrawals", claimsEmpty:"No withdrawals yet", claimQr:"QR",
+  statTransp:"Faucet transparency", transpEmpty:"Unavailable", transpToday:(a,b)=>`Paid out today: ${a}${b?(' / '+b):''} sats`,
+  zapTip:"Zap this athlete ⚡",
   err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
   loading:"⚡ Loading AI model…", alignPose:"Get into position (match the silhouette)", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
@@ -642,6 +681,11 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   capHit:"Límite diario alcanzado — vuelve mañana ⚡", capLock:(t)=>`Límite de sats alcanzado 🔒 vuelve en ${t}`,
   introTitle:"⚡ Bienvenido a PoW Coach", introBody:"Mueve tu cuerpo, gana sats. La cámara cuenta tus repeticiones y te recompensa en bitcoin real ⚡. Conecta una wallet Lightning (botón 👤) para ganar y retirar. Gratis, sin anuncios, sin registro.", introGo:"¡Vamos! 💪",
   faucetDry:"⚡ Faucet temporalmente sin fondos — vuelve pronto 🙏", faucetLow:"⚡ Faucet casi vacío",
+  diffLabel:"Dificultad", diffEasy:"Fácil", diffNormal:"Normal", diffHard:"Difícil",
+  restBtn:"Temporizador de descanso", restTitle:"Descanso", restSkip:"Terminar", restDone:"¡Descanso terminado — vamos! 💪",
+  statClaims:"Retiros recientes", claimsEmpty:"Aún no hay retiros", claimQr:"QR",
+  statTransp:"Transparencia del faucet", transpEmpty:"No disponible", transpToday:(a,b)=>`Repartido hoy: ${a}${b?(' / '+b):''} sats`,
+  zapTip:"Zap a este atleta ⚡",
   err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
   loading:"⚡ Cargando modelo IA…", alignPose:"Ponte en posición (imita la silueta)", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
@@ -1007,7 +1051,7 @@ function applyLangStatic(){
 }
 window.openLang=()=>$('modal-lang').classList.add('show');
 window.setLang=l=>{S.lang=l;store.set('powlang',l);closeModal('modal-lang');
-  applyLangStatic();renderHome();say(L().voice.start,{force:true});maybeIntro();};
+  applyLangStatic();renderHome();say(L().voice.start,{force:true});renderDiff();maybeIntro();};
 
 function renderHome(){
   ensureWeek();
@@ -1297,7 +1341,7 @@ function setRing(f){
   smoothForm=smoothForm*0.7+f*0.3;
   const s=Math.round(smoothForm);
   r.style.strokeDashoffset=C*(1-s/100);
-  r.style.stroke=s>=CFG.PERFECT_THRESHOLD?'var(--grn)':s>=60?'var(--acc)':'var(--hot)';
+  r.style.stroke=s>=perfectThreshold()?'var(--grn)':s>=60?'var(--acc)':'var(--hot)';
   $('ring-num').textContent=s;
 }
 function handle(r){
@@ -1359,7 +1403,7 @@ function onScore(form){
   const before=S.week.progress[id]||0;
   S.week.progress[id]=before+1;
   $('wk-count').textContent=S.week.progress[id];
-  const perfect=form>=CFG.PERFECT_THRESHOLD;
+  const perfect=form>=perfectThreshold();
   let gotSats=0;
 
   if(perfect){
@@ -1524,7 +1568,8 @@ window.addEventListener('appinstalled',()=>{ const b=$('install-btn'); if(b)b.st
 
 /* ---------- état du faucet : bannière "à sec / bientôt vide" ---------- */
 async function checkFaucet(){
-  try{ const d=await (await fetch(API()+'/faucet')).json(); const b=$('faucet-banner'); if(!b)return;
+  try{ const d=await (await fetch(API()+'/faucet')).json(); S.faucetData=d; renderTransparency(d);
+    const b=$('faucet-banner'); if(!b)return;
     if(d.dry){ b.textContent=L().faucetDry; b.className='faucet-banner'; b.style.display='block'; }
     else if(d.low){ b.textContent=L().faucetLow; b.className='faucet-banner low'; b.style.display='block'; }
     else b.style.display='none';
@@ -1536,6 +1581,47 @@ window.closeIntro=()=>{ store.set('powseen',1); closeModal('modal-intro'); };
 function maybeIntro(){ if(store.get('powseen'))return; const T=L();
   $('intro-title').textContent=T.introTitle; $('intro-body').textContent=T.introBody; $('intro-go').textContent=T.introGo;
   $('modal-intro').classList.add('show'); }
+
+/* ---------- A. historique des retraits (local, appareil) ---------- */
+function logClaim(amount,method){ const l=store.get('powclaims',[]); l.unshift({t:Date.now(),amount,method}); store.set('powclaims',l.slice(0,30)); }
+function renderClaims(){ const wrap=$('claims-list'); if(!wrap)return; const T=L(),l=store.get('powclaims',[]);
+  $('st-claims').textContent=T.statClaims;
+  if(!l.length){ wrap.innerHTML=`<p class="hint">${T.claimsEmpty}</p>`; return; }
+  wrap.innerHTML=l.map(c=>{ const d=new Date(c.t), dd=d.toLocaleDateString(S.lang)+' '+d.toTimeString().slice(0,5);
+    const m=c.method==='lnaddress'?'⚡ LN Address':'🔳 '+T.claimQr;
+    return `<div class="claim-item"><span class="amt">+${c.amount} sats</span><span class="meta">${m} · ${dd}</span></div>`; }).join(''); }
+
+/* ---------- B. niveaux de difficulté (ajuste le seuil "parfait") ---------- */
+const DIFFS=['easy','normal','hard'], DIFF_OFF={easy:-10,normal:0,hard:5};
+function curDiff(){ return store.get('powdiff','normal'); }
+function perfectThreshold(){ return Math.min(99,Math.max(60,(CFG.PERFECT_THRESHOLD||92)+(DIFF_OFF[curDiff()]||0))); }
+window.setDiff=(d)=>{ store.set('powdiff',d); renderDiff(); };
+function renderDiff(){ const seg=$('diff-seg'); if(!seg)return; const T=L(),cur=curDiff();
+  const lab=$('diff-label'); if(lab)lab.textContent=T.diffLabel;
+  const rb=$('rest-btn-l'); if(rb)rb.textContent=T.restBtn;
+  seg.innerHTML=DIFFS.map(d=>`<button class="${d===cur?'on':''}" onclick="setDiff('${d}')">${T['diff'+d[0].toUpperCase()+d.slice(1)]}</button>`).join(''); }
+
+/* ---------- C. minuteur de repos (autonome, n'interfère pas avec la caméra) ---------- */
+let restTimer=null,restLeft=0;
+window.openRest=()=>{ const T=L(); $('rest-title').textContent=T.restTitle; $('rest-skip').textContent=T.restSkip;
+  $('rest-presets').innerHTML=[30,45,60,90].map(s=>`<button onclick="startRest(${s})">${s}s</button>`).join('');
+  $('rest-count').textContent='--'; $('modal-rest').classList.add('show'); };
+window.startRest=(s)=>{ clearInterval(restTimer); restLeft=s; $('rest-count').textContent=restLeft;
+  if(navigator.vibrate)navigator.vibrate(20);
+  restTimer=setInterval(()=>{ restLeft--; $('rest-count').textContent=restLeft>0?restLeft:'✓';
+    if(restLeft<=0){ clearInterval(restTimer); if(navigator.vibrate)navigator.vibrate([80,60,80,60,180]);
+      say(L().restDone,{force:true}); toast(L().restDone); setTimeout(()=>closeModal('modal-rest'),1200); } },1000); };
+window.stopRest=()=>{ clearInterval(restTimer); closeModal('modal-rest'); };
+
+/* ---------- F. transparence du faucet (alimenté par /faucet) ---------- */
+function renderTransparency(d){ const card=$('transp-card'); if(!card)return; const T=L();
+  $('st-transp').textContent=T.statTransp;
+  if(!d||typeof d.todaySpent!=='number'){ card.innerHTML=`<p class="hint">${T.transpEmpty}</p>`; return; }
+  const b=d.dailyBudget||0, pct=b?Math.min(100,Math.round(d.todaySpent/b*100)):0;
+  card.innerHTML=`<div>${T.transpToday(d.todaySpent,b||'')}</div>${b?`<div class="bar"><i style="width:${pct}%"></i></div>`:''}`; }
+
+/* ---------- E. zap d'un athlète (ouvre le wallet sur son adresse Lightning) ---------- */
+window.zapAthlete=(a)=>{ if(a) window.location.href='lightning:'+a; };
 
 /* =========================================================
    RETRAIT — Lightning Address (auto) ou LNURL-withdraw (QR)
@@ -1579,6 +1665,7 @@ window.doClaim=async()=>{
     if(!r.ok)throw new Error(d.error||T.errWithdraw);
     closeModal('modal-preclaim');
     if(d.method==='lnaddress' && d.paid){
+      logClaim(amount,'lnaddress');
       // solde serveur si fourni, sinon déduction locale (retrait partiel possible)
       S.balance=(typeof d.balance==='number')?d.balance:Math.max(0,S.balance-amount);persist();renderHome();
       $('claim-title').textContent=T.paidOk(amount);
@@ -1588,6 +1675,7 @@ window.doClaim=async()=>{
       $('modal-claim').classList.add('show');
       if(navigator.vibrate)navigator.vibrate([60,40,120,40,180]);
     }else if(d.lnurl){
+      logClaim(amount,'lnurl');
       // QR à scanner — solde serveur si fourni, sinon déduction locale
       S.lastLnurl=d.lnurl;S.balance=(typeof d.balance==='number')?d.balance:Math.max(0,S.balance-amount);persist();renderHome();
       $('claim-title').textContent='⚡ '+amount+' SATS';
@@ -1639,6 +1727,7 @@ function renderStats(){
       <div class="bar"><i style="width:${Math.round(v/max*100)}%;background:${THEME_C[sp.theme]}"></i></div>`;
     wrap.appendChild(d); });
   if(!wrap.children.length){ wrap.innerHTML=`<p class="hint">${T.noStats}</p>`; }
+  renderClaims(); renderTransparency(S.faucetData); checkFaucet(); // historique + transparence
 }
 function drawBars(cv,labels,vals){
   const dpr=window.devicePixelRatio||1, W=cv.clientWidth||cv.parentElement.clientWidth-28, H=cv.height;
@@ -1703,7 +1792,7 @@ window.publishScore=async()=>{
     S.nick=nick.slice(0,20);store.set('pownick',S.nick);
     const ev=await signEvent({ kind:30078, created_at:Math.floor(Date.now()/1000),
       tags:[['d','powcoach-score'],['n',S.nick],['reps',String(st.totalReps)],['streak',String(st.streak)],['t','powcoach']],
-      content:JSON.stringify({reps:st.totalReps,streak:st.streak,perfect:st.totalPerfect,nick:S.nick}) });
+      content:JSON.stringify({reps:st.totalReps,streak:st.streak,perfect:st.totalPerfect,nick:S.nick,zap:(store.get('powlnaddr','')||undefined)}) }); // zap: adresse LN opt-in (si renseignée)
     let ok=0;
     await Promise.all(DEFAULT_RELAYS.map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
     toast(ok?T.published(ok):T.pubFail);
@@ -1730,9 +1819,11 @@ window.loadBoard=async(force)=>{
   if(!arr.length){ list.innerHTML=`<p class="hint">${T.boardEmpty}</p>`; }
   arr.forEach((s,i)=>{ const row=document.createElement('div');
     row.className='board-row'+(i<3?' top'+(i+1):'')+(s.pub===myPub?' me':'');
+    const canZap = s.zap && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.zap) && s.pub!==myPub;
+    const zapBtn = canZap ? `<button class="zap" title="${T.zapTip}" onclick="zapAthlete('${esc(s.zap)}')">⚡</button>` : '';
     row.innerHTML=`<div class="rank">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div>
       <div class="who"><b>${esc(s.nick||'anon')}</b><small>${s.pub.slice(0,12)}…</small></div>
-      <div class="score">${s.reps} reps${s.streak>1?' · 🔥'+s.streak:''}</div>`;
+      <div class="score">${s.reps} reps${s.streak>1?' · 🔥'+s.streak:''}</div>${zapBtn}`;
     list.appendChild(row); });
   list.dataset.loaded='1';
 };
@@ -1746,7 +1837,7 @@ function queryRelay(url,scores){ return new Promise((res)=>{
       try{data=JSON.parse(ev.content);}catch(e){}
       const reps=parseInt(data.reps||0,10);
       const prev=scores.get(ev.pubkey);
-      if(!prev||reps>prev.reps) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10)});
+      if(!prev||reps>prev.reps) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10),zap:data.zap});
     } else if(d[0]==='EOSE'){ clearTimeout(to);try{ws.close();}catch(e){}res(); } }catch(e){} };
   ws.onerror=()=>{clearTimeout(to);res();};
 }); }
@@ -1867,7 +1958,7 @@ function importChallengeFromHash(){
 }
 
 /* ---------- init ---------- */
-ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();
+ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();renderDiff();
 if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');} // 1re visite : langue d'abord, l'intro suivra (setLang)
 else maybeIntro();
 </script>

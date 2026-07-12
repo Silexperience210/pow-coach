@@ -3,7 +3,7 @@
    seulement des booléens : { configured, dry, low }.
      dry  = solde < MIN_CLAIM_SATS   → ne peut plus payer même un petit retrait
      low  = solde < FAUCET_LOW_SATS  → bientôt vide (défaut 50) */
-import { json, preflight, originOk, faucetBalanceSats } from "./_shared.js";
+import { json, preflight, originOk, faucetBalanceSats, ledgerSpent } from "./_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -14,7 +14,13 @@ export async function onRequestGet({ request, env }) {
     const bal = await faucetBalanceSats(env);
     const minClaim = parseInt(env.MIN_CLAIM_SATS || "10", 10);
     const low = parseInt(env.FAUCET_LOW_SATS || "50", 10);
-    return json({ configured: true, dry: bal < minClaim, low: bal < low }, 200, env);
+    // transparence : distribué aujourd'hui + budget/jour (agrégats, pas de données par-user)
+    let todaySpent = null;
+    if (env.LEDGER) {
+      try { const s = await ledgerSpent(env, new Date().toISOString().slice(0, 10)); todaySpent = s.spent || 0; } catch (e) { /* best-effort */ }
+    }
+    const dailyBudget = parseInt(env.DAILY_BUDGET_SATS || "0", 10) || null;
+    return json({ configured: true, dry: bal < minClaim, low: bal < low, todaySpent, dailyBudget }, 200, env);
   } catch (e) {
     return json({ configured: true, error: "wallet_unreachable" }, 200, env);
   }
