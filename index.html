@@ -482,8 +482,10 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     <div class="run-top">
       <button class="iconbtn" onclick="runExit()">←</button>
       <div class="brand" id="run-title">🏃 Course & Marche</div>
+      <button class="iconbtn" onclick="importGPX()" title="importer GPX (Apple/Huawei…)">📁</button>
       <button class="iconbtn" id="run-recenter" onclick="runRecenter()" title="recentrer">◎</button>
     </div>
+    <input type="file" id="gpx-file" accept=".gpx,application/gpx+xml,text/xml" hidden onchange="onGPXFile(event)">
     <div class="run-gpspill" id="run-gpspill">GPS…</div>
     <div class="run-hud">
       <div class="run-mode" id="run-modechip"><span id="run-mode-em">🚶</span><span id="run-mode-l">—</span></div>
@@ -686,7 +688,8 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   run:{ title:"Course & Marche", start:"Démarrer", stop:"Terminer", ready:"Prêt à partir", paused:"En pause", running:"Course", walking:"Marche",
     durL:"durée", paceL:"allure /km", gpsWait:"📡 Recherche GPS…", gpsReady:"GPS prêt ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Signal GPS faible", gpsDenied:"⚠ Autorise la localisation", noGeo:"GPS non disponible sur cet appareil",
     hrConnect:"Connecter cardio", hrUnsupported:"Bluetooth non supporté (Android Chrome requis)", hrOk:"Cardio connecté ❤️", hrFail:"Cardio non connecté",
-    voiceKm:(n)=>`${n} kilomètre${n>1?'s':''} !`, voiceDone:(km)=>`Séance terminée. ${km} kilomètres. Bravo !` } },
+    voiceKm:(n)=>`${n} kilomètre${n>1?'s':''} !`, voiceDone:(km)=>`Séance terminée. ${km} kilomètres. Bravo !`,
+    gpxFail:"Fichier GPX illisible", gpxEmpty:"Aucun point GPS dans ce fichier", gpxBusy:"Termine la séance en cours d'abord", gpxOk:(km)=>`📁 Trace importée : ${km} km (visualisation, sans sats)` } },
 en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your form live.",
   sports:"Disciplines", goals:"This week's goals", perfectL:"sat / perfect rep", comboL:"boosted combos", goalL:"sats / goal",
   reps:"reps", sec:"sec", hits:"hits", week:"this week", form:"FORM", stop:"■ Finish", cam:"⟳ Camera",
@@ -736,7 +739,8 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   run:{ title:"Run & Walk", start:"Start", stop:"Finish", ready:"Ready to go", paused:"Paused", running:"Running", walking:"Walking",
     durL:"time", paceL:"pace /km", gpsWait:"📡 Locating GPS…", gpsReady:"GPS ready ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Weak GPS signal", gpsDenied:"⚠ Allow location", noGeo:"GPS not available on this device",
     hrConnect:"Connect heart rate", hrUnsupported:"Bluetooth not supported (needs Android Chrome)", hrOk:"Heart rate connected ❤️", hrFail:"Heart rate not connected",
-    voiceKm:(n)=>`${n} kilometer${n>1?'s':''}!`, voiceDone:(km)=>`Workout done. ${km} kilometers. Well done!` } },
+    voiceKm:(n)=>`${n} kilometer${n>1?'s':''}!`, voiceDone:(km)=>`Workout done. ${km} kilometers. Well done!`,
+    gpxFail:"Unreadable GPX file", gpxEmpty:"No GPS points in this file", gpxBusy:"Finish the current session first", gpxOk:(km)=>`📁 Track imported: ${km} km (view only, no sats)` } },
 es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos en vivo.",
   sports:"Disciplinas", goals:"Objetivos de la semana", perfectL:"sat / gesto perfecto", comboL:"combos mejorados", goalL:"sats / objetivo",
   reps:"reps", sec:"seg", hits:"golpes", week:"esta semana", form:"FORMA", stop:"■ Terminar", cam:"⟳ Cámara",
@@ -786,7 +790,8 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   run:{ title:"Correr & Andar", start:"Empezar", stop:"Terminar", ready:"Listo", paused:"En pausa", running:"Corriendo", walking:"Andando",
     durL:"tiempo", paceL:"ritmo /km", gpsWait:"📡 Buscando GPS…", gpsReady:"GPS listo ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Señal GPS débil", gpsDenied:"⚠ Permite la ubicación", noGeo:"GPS no disponible en este dispositivo",
     hrConnect:"Conectar pulso", hrUnsupported:"Bluetooth no soportado (requiere Android Chrome)", hrOk:"Pulso conectado ❤️", hrFail:"Pulso no conectado",
-    voiceKm:(n)=>`¡${n} kilómetro${n>1?'s':''}!`, voiceDone:(km)=>`Sesión terminada. ${km} kilómetros. ¡Bien hecho!` } }
+    voiceKm:(n)=>`¡${n} kilómetro${n>1?'s':''}!`, voiceDone:(km)=>`Sesión terminada. ${km} kilómetros. ¡Bien hecho!`,
+    gpxFail:"Archivo GPX ilegible", gpxEmpty:"Sin puntos GPS en el archivo", gpxBusy:"Termina la sesión actual primero", gpxOk:(km)=>`📁 Ruta importada: ${km} km (solo visual, sin sats)` } }
 };
 const VOICE_LANG = { fr:'fr-FR', en:'en-US', es:'es-ES' };
 
@@ -1668,7 +1673,7 @@ function runStart(){
   ensureDay();
   R.dist=0;R.tickedDist=0;R.combo=0;R.sats=0;R.pts=[];R.lastPt=null;R.speedEMA=0;R.lastKm=0;R.startTs=Date.now();R.running=true;
   S.sessionSats=0;
-  if(R.poly){R.poly.setLatLngs([]);}
+  if(R.poly){ R.map&&R.map.removeLayer(R.poly); R.poly=null; }   // repart d'une trace vierge (verte)
   startServerSession('run');                        // séance notée serveur (si connecté)
   if(S.serverMode && !S.token) toast(L().loginToEarn);
   $('run-btn').textContent='■ '+T.stop; $('run-btn').className='run-stop';
@@ -1736,6 +1741,51 @@ window.runToggle=()=>{ R.running?runStop():runStart(); };
 window.runExit=()=>{ if(R.running)runStop(); goHome(); };
 window.runRecenter=()=>{ R.follow=true; if(R.map&&R.marker)R.map.setView(R.marker.getLatLng(),16); };
 window.connectHR=connectHR;
+
+/* ---- Import GPX (Apple Santé / Huawei Health / Strava…) ----
+   Pont pour tes données montre : on VISUALISE la trace + résumé (distance,
+   durée, allure). PAS de sats : un fichier n'est pas vérifiable, et le serveur
+   rejette de toute façon des horodatages hors fenêtre de séance. Honnête. */
+function importGPX(){ if(R.running){ toast(L().run.gpxBusy); return; } $('gpx-file').click(); }
+function onGPXFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; ev.target.value='';
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ parseGPX(String(rd.result)); }catch(e){ toast(L().run.gpxFail); } };
+  rd.onerror=()=>toast(L().run.gpxFail);
+  rd.readAsText(f);
+}
+function parseGPX(text){
+  const T=L().run;
+  const doc=new DOMParser().parseFromString(text,'application/xml');
+  if(doc.getElementsByTagName('parsererror').length){ toast(T.gpxFail); return; }
+  let nodes=doc.getElementsByTagName('trkpt');
+  if(!nodes.length) nodes=doc.getElementsByTagName('rtept');   // repli itinéraire
+  const pts=[...nodes].map(p=>{ const tm=p.getElementsByTagName('time')[0];
+    return { lat:parseFloat(p.getAttribute('lat')), lng:parseFloat(p.getAttribute('lon')),
+      t:tm?Date.parse(tm.textContent):NaN }; })
+    .filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+  if(pts.length<2){ toast(T.gpxEmpty); return; }
+  let dist=0; for(let i=1;i<pts.length;i++){ const d=haversine(pts[i-1],pts[i]); if(d<200) dist+=d; } // ignore les gros sauts
+  const times=pts.map(p=>p.t).filter(Number.isFinite);
+  const dur=times.length>=2 ? (times[times.length-1]-times[0]) : 0;
+  const mps=dur>0 ? dist/(dur/1000) : 0;
+  runInitMap(); if(R.map)R.map.invalidateSize();
+  if(R.poly){ R.map.removeLayer(R.poly); R.poly=null; }
+  R.pts=pts.map(p=>[p.lat,p.lng]);
+  R.poly=L.polyline(R.pts,{color:'#FFC531',weight:5,opacity:.92}).addTo(R.map); // trace importée = or
+  runMarker(pts[pts.length-1].lat,pts[pts.length-1].lng,false);
+  R.follow=false;
+  try{ R.map.fitBounds(R.poly.getBounds(),{padding:[30,30]}); }catch(e){}
+  // affichage résumé (sans sats)
+  R.running=false; R.dist=dist; R.elapsed=dur; R.speedEMA=mps;
+  runStatUI();
+  $('run-gpspill').textContent='📁 '+(dist/1000).toFixed(2)+' km'+(dur?' · '+fmtRunDur(dur):'');
+  $('run-gpspill').className='run-gpspill ok';
+  toast(T.gpxOk((dist/1000).toFixed(2)));
+}
+window.importGPX=importGPX;
+window.onGPXFile=onGPXFile;
 
 /* =========================================================
    COMPTE — LNURL-auth (connexion par signature wallet)
