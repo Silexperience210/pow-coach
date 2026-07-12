@@ -9,7 +9,10 @@ const SHELL = ['/', '/index.html', '/manifest.json', '/vendor/qrcode.min.js',
   '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache:'reload' → on rapatrie le shell frais (contourne le cache HTTP/CDN) à chaque version
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => Promise.all(SHELL.map((u) => fetch(u, { cache: 'reload' }).then((r) => c.put(u, r)).catch(() => {}))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
