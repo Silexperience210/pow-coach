@@ -1836,8 +1836,9 @@ function queryRelay(url,scores){ return new Promise((res)=>{
     if(d[0]==='EVENT'){ const ev=d[2]; let data={};
       try{data=JSON.parse(ev.content);}catch(e){}
       const reps=parseInt(data.reps||0,10);
+      const ts=ev.created_at||0; // "dernier publié fait foi" : on garde l'événement le plus récent
       const prev=scores.get(ev.pubkey);
-      if(!prev||reps>prev.reps) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10),zap:data.zap});
+      if(!prev||ts>=prev.ts) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10),zap:data.zap,ts});
     } else if(d[0]==='EOSE'){ clearTimeout(to);try{ws.close();}catch(e){}res(); } }catch(e){} };
   ws.onerror=()=>{clearTimeout(to);res();};
 }); }
