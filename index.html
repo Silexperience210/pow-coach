@@ -43,6 +43,9 @@ window.POW_CONFIG = Object.freeze({
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="/vendor/qrcode.min.js"></script>
+<!-- Leaflet (auto-hébergé, open-source) — carte OpenStreetMap du mode Course -->
+<link rel="stylesheet" href="/vendor/leaflet.css">
+<script src="/vendor/leaflet.js" defer></script>
 <style>
 :root{
   --bg:#0A0A0C; --panel:#141419; --panel2:#1C1C24; --line:#2A2A35;
@@ -435,6 +438,71 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
   </div>
 </div>
 
+<!-- ============ RUN (course & marche · GPS + OpenStreetMap) ============ -->
+<style>
+#screen-run{padding:0;background:#0A0A0C}
+#run-map{position:absolute;inset:0;z-index:0;background:#12131a}
+.run-wrap{position:relative;width:100%;height:100dvh;overflow:hidden}
+.run-top{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:8px;
+  padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:linear-gradient(#000c,#0000)}
+.run-top .brand{flex:1;text-align:center;font-size:17px}
+.run-gpspill{position:absolute;top:calc(60px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+  z-index:5;background:#000b;border:1px solid #ffffff22;color:#fff;font-size:12px;font-weight:600;
+  padding:6px 12px;border-radius:20px;white-space:nowrap;backdrop-filter:blur(6px)}
+.run-gpspill.ok{border-color:#3DFFA0;color:#3DFFA0}
+.run-gpspill.warn{border-color:#FFC531;color:#FFC531}
+.run-hud{position:absolute;left:0;right:0;bottom:0;z-index:5;
+  padding:14px 14px calc(16px + env(safe-area-inset-bottom));
+  background:linear-gradient(#0000,#000d 34%,#000f)}
+.run-mode{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:15px;
+  padding:5px 13px;border-radius:20px;margin:0 auto 10px;width:fit-content;
+  background:#ffffff12;border:1px solid #ffffff22}
+.run-mode.run{background:#FF6B0022;border-color:#FF6B00;color:#FF6B00}
+.run-mode.walk{background:#00D4FF22;border-color:#00D4FF;color:#00D4FF}
+.run-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.run-cell{background:#ffffff0c;border:1px solid #ffffff14;border-radius:14px;padding:10px 8px;text-align:center}
+.run-cell b{display:block;font-family:'Chakra Petch',monospace;font-size:26px;line-height:1;color:#fff;font-variant-numeric:tabular-nums}
+.run-cell.big b{font-size:34px;color:#3DFFA0}
+.run-cell span{display:block;margin-top:5px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.run-cell .sub{font-size:13px;color:#FFC531;margin-top:2px}
+.run-actions{display:flex;gap:10px}
+.run-actions button{flex:1;border:none;border-radius:16px;padding:16px;font-weight:700;font-size:16px;font-family:inherit;cursor:pointer}
+.run-start{background:#3DFFA0;color:#000}
+.run-stop{background:#FF2244;color:#fff}
+.run-ghost{background:#ffffff14;color:#fff;flex:0 0 auto;padding:16px 18px}
+.run-hr{display:inline-flex;align-items:center;gap:6px;color:#FF4FA3;font-weight:700;font-size:14px}
+.run-hr.off{color:var(--dim)}
+.leaflet-control-attribution{font-size:9px !important;background:#000a !important;color:#aaa !important}
+.leaflet-control-attribution a{color:#3DFFA0 !important}
+.leaflet-bar a{background:#161821 !important;color:#fff !important;border-color:#000 !important}
+</style>
+<div class="screen" id="screen-run">
+  <div class="run-wrap">
+    <div id="run-map"></div>
+    <div class="run-top">
+      <button class="iconbtn" onclick="runExit()">←</button>
+      <div class="brand" id="run-title">🏃 Course & Marche</div>
+      <button class="iconbtn" id="run-recenter" onclick="runRecenter()" title="recentrer">◎</button>
+    </div>
+    <div class="run-gpspill" id="run-gpspill">GPS…</div>
+    <div class="run-hud">
+      <div class="run-mode" id="run-modechip"><span id="run-mode-em">🚶</span><span id="run-mode-l">—</span></div>
+      <div class="run-stats">
+        <div class="run-cell big"><b id="run-dist">0.00</b><span id="run-dist-l">km</span></div>
+        <div class="run-cell"><b id="run-time">0:00</b><span id="run-time-l">durée</span></div>
+        <div class="run-cell"><b id="run-pace">—</b><span id="run-pace-l">allure</span><div class="sub" id="run-sats">⚡0</div></div>
+      </div>
+      <div style="text-align:center;margin-bottom:9px">
+        <span class="run-hr off" id="run-hr"><span>❤️</span><span id="run-hr-val">Connecter cardio</span></span>
+      </div>
+      <div class="run-actions">
+        <button class="run-start" id="run-btn" onclick="runToggle()">▶ Démarrer</button>
+        <button class="run-ghost" id="run-hr-btn" onclick="connectHR()">❤️</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ LANG ============ -->
 <div class="modal" id="modal-lang">
   <div class="sheet">
@@ -614,7 +682,11 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
     knee_hit:"Genou puissant ! Hanche engagée", knee_up:"Monte le genou au-dessus de la hanche",
     torso:"Buste et bras visibles face caméra" },
   voice:{ start:"C'est parti !", getReady:"Prépare-toi", perfect:"Parfait !", combo:(n)=>`Combo ${n} !`, comboBroken:"Combo perdu", tooHigh:"Trop haut", tooLow:"Trop bas",
-    goal:"Objectif de la semaine atteint ! Félicitations !", milestone:(n,u)=>`${n} ${u==='sec'?'secondes':u==='coups'?'coups':'répétitions'}`, cap:"Plafond du jour atteint" } },
+    goal:"Objectif de la semaine atteint ! Félicitations !", milestone:(n,u)=>`${n} ${u==='sec'?'secondes':u==='coups'?'coups':'répétitions'}`, cap:"Plafond du jour atteint" },
+  run:{ title:"Course & Marche", start:"Démarrer", stop:"Terminer", ready:"Prêt à partir", paused:"En pause", running:"Course", walking:"Marche",
+    durL:"durée", paceL:"allure /km", gpsWait:"📡 Recherche GPS…", gpsReady:"GPS prêt ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Signal GPS faible", gpsDenied:"⚠ Autorise la localisation", noGeo:"GPS non disponible sur cet appareil",
+    hrConnect:"Connecter cardio", hrUnsupported:"Bluetooth non supporté (Android Chrome requis)", hrOk:"Cardio connecté ❤️", hrFail:"Cardio non connecté",
+    voiceKm:(n)=>`${n} kilomètre${n>1?'s':''} !`, voiceDone:(km)=>`Séance terminée. ${km} kilomètres. Bravo !` } },
 en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your form live.",
   sports:"Disciplines", goals:"This week's goals", perfectL:"sat / perfect rep", comboL:"boosted combos", goalL:"sats / goal",
   reps:"reps", sec:"sec", hits:"hits", week:"this week", form:"FORM", stop:"■ Finish", cam:"⟳ Camera",
@@ -660,7 +732,11 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
     knee_hit:"Powerful knee! Drive the hip", knee_up:"Raise the knee above your hip",
     torso:"Torso and arms visible, face the camera" },
   voice:{ start:"Let's go!", getReady:"Get ready", perfect:"Perfect!", combo:(n)=>`Combo ${n}!`, comboBroken:"Combo lost", tooHigh:"Too high", tooLow:"Too low",
-    goal:"Weekly goal reached! Congratulations!", milestone:(n,u)=>`${n} ${u==='sec'?'seconds':u==='hits'?'hits':'reps'}`, cap:"Daily cap reached" } },
+    goal:"Weekly goal reached! Congratulations!", milestone:(n,u)=>`${n} ${u==='sec'?'seconds':u==='hits'?'hits':'reps'}`, cap:"Daily cap reached" },
+  run:{ title:"Run & Walk", start:"Start", stop:"Finish", ready:"Ready to go", paused:"Paused", running:"Running", walking:"Walking",
+    durL:"time", paceL:"pace /km", gpsWait:"📡 Locating GPS…", gpsReady:"GPS ready ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Weak GPS signal", gpsDenied:"⚠ Allow location", noGeo:"GPS not available on this device",
+    hrConnect:"Connect heart rate", hrUnsupported:"Bluetooth not supported (needs Android Chrome)", hrOk:"Heart rate connected ❤️", hrFail:"Heart rate not connected",
+    voiceKm:(n)=>`${n} kilometer${n>1?'s':''}!`, voiceDone:(km)=>`Workout done. ${km} kilometers. Well done!` } },
 es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos en vivo.",
   sports:"Disciplinas", goals:"Objetivos de la semana", perfectL:"sat / gesto perfecto", comboL:"combos mejorados", goalL:"sats / objetivo",
   reps:"reps", sec:"seg", hits:"golpes", week:"esta semana", form:"FORMA", stop:"■ Terminar", cam:"⟳ Cámara",
@@ -706,7 +782,11 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
     knee_hit:"¡Rodillazo potente! Empuja la cadera", knee_up:"Sube la rodilla por encima de la cadera",
     torso:"Torso y brazos visibles frente a la cámara" },
   voice:{ start:"¡Vamos!", getReady:"Prepárate", perfect:"¡Perfecto!", combo:(n)=>`¡Combo ${n}!`, comboBroken:"Combo perdido", tooHigh:"Muy alto", tooLow:"Muy bajo",
-    goal:"¡Objetivo semanal logrado! ¡Felicidades!", milestone:(n,u)=>`${n} ${u==='sec'?'segundos':u==='hits'?'golpes':'repeticiones'}`, cap:"Límite diario alcanzado" } }
+    goal:"¡Objetivo semanal logrado! ¡Felicidades!", milestone:(n,u)=>`${n} ${u==='sec'?'segundos':u==='hits'?'golpes':'repeticiones'}`, cap:"Límite diario alcanzado" },
+  run:{ title:"Correr & Andar", start:"Empezar", stop:"Terminar", ready:"Listo", paused:"En pausa", running:"Corriendo", walking:"Andando",
+    durL:"tiempo", paceL:"ritmo /km", gpsWait:"📡 Buscando GPS…", gpsReady:"GPS listo ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Señal GPS débil", gpsDenied:"⚠ Permite la ubicación", noGeo:"GPS no disponible en este dispositivo",
+    hrConnect:"Conectar pulso", hrUnsupported:"Bluetooth no soportado (requiere Android Chrome)", hrOk:"Pulso conectado ❤️", hrFail:"Pulso no conectado",
+    voiceKm:(n)=>`¡${n} kilómetro${n>1?'s':''}!`, voiceDone:(km)=>`Sesión terminada. ${km} kilómetros. ¡Bien hecho!` } }
 };
 const VOICE_LANG = { fr:'fr-FR', en:'en-US', es:'es-ES' };
 
@@ -1020,7 +1100,10 @@ const SPORTS=[
   {id:'punch2',em:'👊',unit:'hits',goal:300,
    name:{fr:'Directs',en:'Straight punches',es:'Directos'},
    tip:{fr:'De profil, garde haute',en:'Side view, guard up',es:'De perfil, guardia alta'},
-   make:punchEngine}]}
+   make:punchEngine}]},
+ {id:'running',em:'🏃',theme:'running',run:true,
+  name:{fr:'Course & Marche',en:'Run & Walk',es:'Correr & Andar'},
+  desc:{fr:'GPS + carte OpenStreetMap',en:'GPS + OpenStreetMap',es:'GPS + OpenStreetMap'},ex:[]}
 ];
 const findEx=id=>{for(const s of SPORTS)for(const e of s.ex)if(e.id===id)return{...e,sport:s};};
 
@@ -1028,7 +1111,7 @@ const findEx=id=>{for(const s of SPORTS)for(const e of s.ex)if(e.id===id)return{
    UI
    ========================================================= */
 const $=id=>document.getElementById(id);
-const THEME_C={muscu:'#FF6B00',gainage:'#00D4FF',yoga:'#A78BFA',pilates:'#FF4FA3',street:'#B8FF29',boxe:'#FF2244',thai:'#FFC531'};
+const THEME_C={muscu:'#FF6B00',gainage:'#00D4FF',yoga:'#A78BFA',pilates:'#FF4FA3',street:'#B8FF29',boxe:'#FF2244',thai:'#FFC531',running:'#3DFFA0'};
 function setTheme(t){document.body.dataset.theme=t;}
 function show(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $('screen-'+n).classList.add('active');}
@@ -1081,6 +1164,7 @@ function renderHome(){
 }
 function openSport(sp){
   setTheme(sp.theme);
+  if(sp.run){ openRun(); return; }   // course & marche → écran GPS/carte dédié
   $('sport-title').textContent=sp.name[S.lang];
   const l=$('exercise-list');l.innerHTML='';
   sp.ex.forEach(e=>{const p=S.week.progress[e.id]||0;
@@ -1487,6 +1571,171 @@ window.stopWorkout=()=>{S.running=false;S.phase='align';S.cdStarted=false;speech
   $('align-meter').classList.remove('show');$('statuspill').classList.remove('show','big');
   const v=$('video');if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());
   v.srcObject=null;submitServerSession();goHome();};
+
+/* =========================================================
+   COURSE & MARCHE — GPS + carte OpenStreetMap (Leaflet, open-source)
+   Récompense par distance : 1 « tick » tous les 100 m parcourus (validés),
+   rejoué et RE-VALIDÉ côté serveur (intervalle mini 20 s / 100 m = anti-triche
+   véhicule/GPS). La course paie naturellement plus que la marche (ticks plus
+   fréquents → combos). Cardio via Web Bluetooth (ceinture/bracelet BLE standard).
+   ========================================================= */
+const R={map:null,tile:null,poly:null,marker:null,running:false,follow:true,
+  pts:[],dist:0,tickedDist:0,combo:0,sats:0,speedEMA:0,lastPt:null,lastT:0,lastKm:0,
+  startTs:0,elapsed:0,watchId:null,timer:null,hr:null,hrDevice:null};
+
+function haversine(a,b){const E=6371000,r=Math.PI/180;
+  const dLat=(b.lat-a.lat)*r,dLon=(b.lng-a.lng)*r,la1=a.lat*r,la2=b.lat*r;
+  const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+  return 2*E*Math.asin(Math.min(1,Math.sqrt(h)));}
+function fmtPace(mps){if(!mps||mps<0.4)return '—';const spk=1000/mps;
+  return Math.floor(spk/60)+':'+String(Math.round(spk%60)).padStart(2,'0');}
+function fmtRunDur(ms){const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;
+  return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0');}
+function comboSatsFor(n){let s=CFG.SATS_PERFECT;for(const t of CFG.COMBO_TIERS)if(n>=t.at)s=t.sats;return s;}
+
+function runInitMap(){
+  if(R.map||typeof L==='undefined')return;
+  R.map=L.map('run-map',{zoomControl:true,attributionControl:true}).setView([48.8566,2.3522],13);
+  R.tile=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19,attribution:'© OpenStreetMap'}).addTo(R.map);
+  R.map.on('dragstart',()=>{R.follow=false;});
+}
+function runMarker(lat,lng,center){
+  if(!R.map)return;
+  if(!R.marker)R.marker=L.circleMarker([lat,lng],{radius:7,color:'#fff',weight:3,fillColor:'#3DFFA0',fillOpacity:1}).addTo(R.map);
+  else R.marker.setLatLng([lat,lng]);
+  if(center)R.map.setView([lat,lng],16);
+}
+function runPlot(lat,lng){
+  if(!R.map)return;
+  R.pts.push([lat,lng]);
+  if(!R.poly)R.poly=L.polyline(R.pts,{color:'#3DFFA0',weight:5,opacity:.9}).addTo(R.map);
+  else R.poly.setLatLngs(R.pts);
+  runMarker(lat,lng,false);
+  if(R.follow)R.map.panTo([lat,lng]);
+}
+function runStatUI(){
+  const T=L().run,mps=R.speedEMA||0;
+  $('run-dist').textContent=(R.dist/1000).toFixed(2);
+  $('run-time').textContent=fmtRunDur(R.running?Date.now()-R.startTs:R.elapsed);
+  $('run-pace').textContent=fmtPace(mps);
+  const chip=$('run-modechip'),em=$('run-mode-em'),lab=$('run-mode-l');
+  if(!R.running){chip.className='run-mode';em.textContent='🏁';lab.textContent=T.ready;}
+  else if(mps<0.6){chip.className='run-mode';em.textContent='⏸';lab.textContent=T.paused;}
+  else if(mps>=2.2){chip.className='run-mode run';em.textContent='🏃';lab.textContent=T.running;}
+  else{chip.className='run-mode walk';em.textContent='🚶';lab.textContent=T.walking;}
+}
+function runTick(){
+  // preuve pour le scoring serveur (le serveur RE-VALIDE et fait autorité)
+  if(S.wsToken && S.repLog.length<5000) S.repLog.push({t:Date.now(),form:100});
+  // estimation visuelle (même logique de combo que le serveur)
+  R.combo++; const sats=comboSatsFor(R.combo);
+  if(S.serverMode){ S.sessionSats+=sats; }
+  else { const g=Math.min(sats,capLeft()); if(g>0){S.balance+=g;S.day.earned+=g;persist();} }
+  R.sats+=sats;
+  bumpStat('running',true,sats);
+  $('run-sats').textContent='⚡'+R.sats;
+  $('balance-val').textContent=S.balance;
+}
+function onRunPos(pos){
+  const c=pos.coords,pill=$('run-gpspill'),T=L().run;
+  if(c.accuracy>40){ pill.textContent=T.gpsWeak; pill.className='run-gpspill warn'; return; }
+  pill.textContent=T.gpsOk; pill.className='run-gpspill ok';
+  const now=pos.timestamp||Date.now(), pt={lat:c.latitude,lng:c.longitude};
+  runPlot(pt.lat,pt.lng);
+  if(!R.lastPt){ R.lastPt=pt; R.lastT=now; if(R.map)R.map.setView([pt.lat,pt.lng],17); return; }
+  const dt=(now-R.lastT)/1000; if(dt<=0)return;
+  const d=haversine(R.lastPt,pt);
+  let mps=(typeof c.speed==='number'&&c.speed>=0)?c.speed:d/dt;
+  R.lastPt=pt; R.lastT=now;
+  if(mps>8.33)return;                              // >30 km/h → saut GPS / véhicule, non compté
+  R.speedEMA=R.speedEMA?R.speedEMA*0.7+mps*0.3:mps;
+  if(mps<0.6||d<1){ runStatUI(); return; }         // quasi immobile → dérive GPS ignorée
+  R.dist+=d;
+  while(R.dist-R.tickedDist>=100){ R.tickedDist+=100; runTick(); }   // 1 tick / 100 m
+  const km=Math.floor(R.dist/1000);
+  if(km>R.lastKm){ R.lastKm=km; say(T.voiceKm(km),{force:true}); if(navigator.vibrate)navigator.vibrate([60,40,60]); }
+  runStatUI();
+}
+function onRunErr(e){
+  const pill=$('run-gpspill'),T=L().run;
+  pill.textContent=e&&e.code===1?T.gpsDenied:T.gpsWeak; pill.className='run-gpspill warn';
+}
+function runStart(){
+  const T=L().run;
+  if(!('geolocation' in navigator)){ toast(T.noGeo); return; }
+  if(S.serverMode && S.token && earnLockLeft()>0){ toast(L().capLock(fmtDur(earnLockLeft()))); return; }
+  ensureDay();
+  R.dist=0;R.tickedDist=0;R.combo=0;R.sats=0;R.pts=[];R.lastPt=null;R.speedEMA=0;R.lastKm=0;R.startTs=Date.now();R.running=true;
+  S.sessionSats=0;
+  if(R.poly){R.poly.setLatLngs([]);}
+  startServerSession('run');                        // séance notée serveur (si connecté)
+  if(S.serverMode && !S.token) toast(L().loginToEarn);
+  $('run-btn').textContent='■ '+T.stop; $('run-btn').className='run-stop';
+  $('run-sats').textContent='⚡0';
+  say(L().voice.start,{force:true});
+  R.watchId=navigator.geolocation.watchPosition(onRunPos,onRunErr,{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+  R.timer=setInterval(()=>{ if(R.running)runStatUI(); },1000);
+  runStatUI();
+}
+function runStop(){
+  if(!R.running)return;
+  R.running=false; R.elapsed=Date.now()-R.startTs; R.speedEMA=0;
+  if(R.watchId!=null){ navigator.geolocation.clearWatch(R.watchId); R.watchId=null; }
+  if(R.timer){ clearInterval(R.timer); R.timer=null; }
+  submitServerSession();                            // le serveur recalcule et crédite
+  const T=L().run, km=(R.dist/1000).toFixed(2);
+  $('run-btn').textContent='▶ '+T.start; $('run-btn').className='run-start';
+  $('run-gpspill').textContent='🏁 '+km+' km · ⚡'+R.sats; $('run-gpspill').className='run-gpspill ok';
+  say(T.voiceDone(km),{force:true});
+  runStatUI();
+}
+function openRun(){
+  setTheme('running');
+  const T=L().run;
+  $('run-title').textContent='🏃 '+T.title;
+  $('run-btn').textContent='▶ '+T.start; $('run-btn').className='run-start';
+  $('run-time-l').textContent=T.durL; $('run-pace-l').textContent=T.paceL;
+  $('run-gpspill').textContent=T.gpsWait; $('run-gpspill').className='run-gpspill';
+  $('run-hr').className=R.hr?'run-hr':'run-hr off'; $('run-hr-val').textContent=R.hr?R.hr+' bpm':T.hrConnect;
+  show('run');
+  requestAnimationFrame(()=>{
+    runInitMap();
+    if(R.map)R.map.invalidateSize();
+    R.follow=true;
+    if('geolocation' in navigator && !R.running){
+      navigator.geolocation.getCurrentPosition(p=>{
+        runMarker(p.coords.latitude,p.coords.longitude,true);
+        $('run-gpspill').textContent=T.gpsReady; $('run-gpspill').className='run-gpspill ok';
+      },()=>{ $('run-gpspill').textContent=T.gpsDenied; $('run-gpspill').className='run-gpspill warn'; },
+      {enableHighAccuracy:true,timeout:10000});
+    }
+  });
+  runStatUI();
+}
+/* ---- Cardio Bluetooth (service standard 0x180D) — Android Chrome ---- */
+async function connectHR(){
+  const T=L().run;
+  if(!navigator.bluetooth){ toast(T.hrUnsupported); return; }
+  try{
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}],optionalServices:['battery_service']});
+    const srv=await dev.gatt.connect();
+    const ch=await (await srv.getPrimaryService('heart_rate')).getCharacteristic('heart_rate_measurement');
+    await ch.startNotifications();
+    ch.addEventListener('characteristicvaluechanged',e=>{
+      const v=e.target.value, flags=v.getUint8(0);
+      const hr=(flags&1)?v.getUint16(1,true):v.getUint8(1);
+      R.hr=hr; $('run-hr').className='run-hr'; $('run-hr-val').textContent=hr+' bpm';
+    });
+    dev.addEventListener('gattserverdisconnected',()=>{ R.hr=null;
+      $('run-hr').className='run-hr off'; $('run-hr-val').textContent=L().run.hrConnect; });
+    R.hrDevice=dev; toast(T.hrOk);
+  }catch(e){ if(e&&e.name!=='NotFoundError') toast(T.hrFail); }
+}
+window.runToggle=()=>{ R.running?runStop():runStart(); };
+window.runExit=()=>{ if(R.running)runStop(); goHome(); };
+window.runRecenter=()=>{ R.follow=true; if(R.map&&R.marker)R.map.setView(R.marker.getLatLng(),16); };
+window.connectHR=connectHR;
 
 /* =========================================================
    COMPTE — LNURL-auth (connexion par signature wallet)

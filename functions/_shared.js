@@ -408,6 +408,7 @@ const REP_MIN_MS = {
   squat: 800, jsquat: 650, lunge: 850, knee: 550, jacks: 380,
   pushup: 900, plank: 950, bridge: 850, crunch: 700,
   jab: 230, punch2: 230, warrior: 950, tree: 950,
+  run: 20000, // 1 tick = 100 m ; <20 s/100 m (>18 km/h soutenu) = véhicule/GPS → rejeté
 };
 export function repMinMs(exId) { return REP_MIN_MS[exId] || 600; }
 function parseTiers(env) {

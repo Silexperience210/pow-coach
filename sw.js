@@ -4,9 +4,9 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v3';
+const CACHE = 'powcoach-v4';
 const SHELL = ['/', '/index.html', '/manifest.json', '/vendor/qrcode.min.js',
-  '/icon-192.png', '/icon-512.png'];
+  '/vendor/leaflet.js', '/vendor/leaflet.css', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   // cache:'reload' → on rapatrie le shell frais (contourne le cache HTTP/CDN) à chaque version
@@ -29,6 +29,8 @@ self.addEventListener('fetch', (e) => {
   if (sameOrigin && /^\/(claim|session|balance|auth|faucet)(\/|$)/.test(url.pathname)) return;
   // gros modèle MediaPipe : réseau direct, pas de cache
   if (/\.task(\?|$)/.test(url.pathname)) return;
+  // tuiles OpenStreetMap : réseau direct (évite de saturer le cache pendant une course)
+  if (url.hostname === 'tile.openstreetmap.org') return;
 
   // navigation : réseau d'abord, repli cache
   if (req.mode === 'navigate') {
