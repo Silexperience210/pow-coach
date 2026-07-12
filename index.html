@@ -913,15 +913,15 @@ function holdEngine(o){let sec=0,last=null;
    Si le bras s'étend mais que le poing est trop haut/bas → on NE compte pas et on
    renvoie un `fault` ('high'/'low') pour le retour vocal ("trop haut"/"trop bas"). */
 function punchEngine(){let armed={l:true,r:true},count=0;
-  const OK=0.28; // fenêtre "horizontal" épaule↔poing ; au-delà = trop haut / trop bas
+  const HI=-0.12, LO=0.33; // bande "horizontale" ASYMÉTRIQUE (calibrée sur data) : poing un peu bas = ok, poing haut = faute
   return{type:'reps',count:()=>count,analyze(P){
     if(!vis(P,[11,12,13,14,15,16]))return{form:null,msg:'torso',dbg:{vis:+visMinOf(P,[11,12,13,14,15,16]).toFixed(2)}};
     const eL=ang(P[11],P[13],P[15]),eR=ang(P[12],P[14],P[16]);
     const dyL=P[15].y-P[11].y, dyR=P[16].y-P[12].y; // <0 poing AU-DESSUS de l'épaule ; >0 EN DESSOUS
     const guard=avg(gs(Math.min(eL,eR),55,35),60);let hit=null,fault=null;
     const dbg={eL:Math.round(eL),eR:Math.round(eR),dyL:+dyL.toFixed(2),dyR:+dyR.toFixed(2),n:count};
-    if(armed.l&&eL>140){armed.l=false; if(Math.abs(dyL)<OK)hit=eL; else fault=dyL<0?'high':'low';}
-    if(armed.r&&eR>140){armed.r=false; if(Math.abs(dyR)<OK)hit=eR; else fault=dyR<0?'high':'low';}
+    if(armed.l&&eL>140){armed.l=false; if(dyL>HI&&dyL<LO)hit=eL; else fault=dyL<HI?'high':'low';}
+    if(armed.r&&eR>140){armed.r=false; if(dyR>HI&&dyR<LO)hit=eR; else fault=dyR<HI?'high':'low';}
     if(eL<130)armed.l=true;if(eR<130)armed.r=true;
     if(hit){count++;const f=gs(hit,165,25);
       return{rep:true,repForm:f,form:f,msg:f>=90?'punch_full':'punch_ext',dbg:{...dbg,n:count}};}
