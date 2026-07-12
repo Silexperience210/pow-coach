@@ -19,7 +19,7 @@
      FAUCET_KV  (KV)              → sessions + auth + plafonds best-effort
      LEDGER     (Durable Object)  → plafonds STRICTS/atomiques (optionnel ;
                                     voir ledger-worker/). Si présent, prime sur KV. */
-import { json, preflight, originOk, lnbitsWithdrawLink, payToLnAddress, reserveBudget, ledgerDebit, ledgerRefundBalance } from "./_shared.js";
+import { json, preflight, originOk, lnbitsWithdrawLink, payToLnAddress, reserveBudget, ledgerDebit, ledgerRefundBalance, faucetBalanceSats } from "./_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -70,6 +70,12 @@ export async function onRequestPost({ request, env }) {
   const reservation = await reserveBudget(env, request, session, amount);
   if (!reservation.ok) { await balanceRefund(); return json({ error: reservation.error }, reservation.status || 429, env); }
   const rollback = async () => { await reservation.rollback(); await balanceRefund(); };
+
+  // ---- pré-check "faucet à sec" : ne promets pas un retrait qu'on ne peut honorer ----
+  try {
+    const fb = await faucetBalanceSats(env);
+    if (fb < amount) { await rollback(); return json({ error: "⚡ Faucet momentanément à sec — reviens bientôt 🙏" }, 503, env); }
+  } catch (e) { /* LNbits injoignable ici → on laisse l'étape de paiement gérer l'erreur */ }
 
   // ---- paiement ----
   try {

@@ -3,7 +3,7 @@
    (plausibilité + combos), RECALCULE les sats, et crédite le solde du compte
    dans le Durable Object (usage unique via le sid → pas de rejeu).
    Le montant réclamé par le client est ignoré : seul le score serveur compte. */
-import { json, preflight, originOk, verifySession, validateRepLog, ledgerCredit } from "../_shared.js";
+import { json, preflight, originOk, verifySession, validateRepLog, ledgerCredit, rateLimitKV, clientIp } from "../_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -18,6 +18,7 @@ const MAX_SESSION_MS = 3 * 3600 * 1000; // une séance vaut ≤ 3 h
 export async function onRequestPost({ request, env }) {
   if (!originOk(request, env)) return json({ error: "Origine refusée" }, 403, env);
   if (!env.LEDGER || !env.SESSION_SECRET) return json({ error: "server_scoring_disabled" }, 501, env);
+  if (!(await rateLimitKV(env, "su:" + clientIp(request), 1000))) return json({ error: "Trop de requêtes" }, 429, env);
 
   let body;
   try { body = await request.json(); } catch { return json({ error: "JSON invalide" }, 400, env); }

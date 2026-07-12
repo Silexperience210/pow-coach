@@ -249,6 +249,29 @@ export async function payToLnAddress(env, lnaddr, amountSats, comment) {
   return { payment_hash: pd.payment_hash, bolt11: inv.pr };
 }
 
+/* ---------- solde du wallet faucet (sats) ----------
+   Pré-check "faucet à sec" (claim.js) + endpoint /faucet. Balance LNbits en msat. */
+export async function faucetBalanceSats(env) {
+  const r = await tfetch(env.LNBITS_URL.replace(/\/+$/, "") + "/api/v1/wallet", {
+    headers: { "X-Api-Key": env.LNBITS_ADMIN_KEY },
+  });
+  if (!r.ok) throw new Error("wallet_unreachable");
+  const w = await r.json();
+  return Math.floor((Number(w.balance) || 0) / 1000);
+}
+
+/* ---------- rate-limit best-effort (KV) ----------
+   true = autorisé (enregistre l'instant), false = trop fréquent. Sans KV → passe. */
+export async function rateLimitKV(env, key, minMs) {
+  if (!env.FAUCET_KV) return true;
+  const k = "rl:" + key;
+  const last = parseInt((await env.FAUCET_KV.get(k)) || "0", 10);
+  const now = Date.now();
+  if (now - last < minMs) return false;
+  await env.FAUCET_KV.put(k, String(now), { expirationTtl: 60 });
+  return true;
+}
+
 /* =========================================================
    PLAFONDS — réservation atomique
    Deux modes :

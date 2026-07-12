@@ -3,7 +3,7 @@
    (HMAC) que le client renverra à /session/submit avec le journal de reps.
    Nécessite : connexion (token), binding LEDGER (DO) et SESSION_SECRET.
    Le scoring serveur est désactivé (501) si l'un manque → l'app reste en legacy. */
-import { json, preflight, originOk, randHex, signSession } from "../_shared.js";
+import { json, preflight, originOk, randHex, signSession, rateLimitKV, clientIp } from "../_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -16,6 +16,7 @@ async function getSession(env, token) {
 export async function onRequestPost({ request, env }) {
   if (!originOk(request, env)) return json({ error: "Origine refusée" }, 403, env);
   if (!env.LEDGER || !env.SESSION_SECRET) return json({ error: "server_scoring_disabled" }, 501, env);
+  if (!(await rateLimitKV(env, "ss:" + clientIp(request), 1500))) return json({ error: "Trop de requêtes" }, 429, env);
 
   let body;
   try { body = await request.json(); } catch { return json({ error: "JSON invalide" }, 400, env); }

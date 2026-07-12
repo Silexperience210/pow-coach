@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0A0A0C">
 <title>PoW Coach — Proof of Workout ⚡</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PoW Coach">
 
 <!-- ╔══════════════════════════════════════════════════════════════════╗
      ║  ⚙ CONFIGURATION PROPRIÉTAIRE — À ÉDITER AVANT DÉPLOIEMENT       ║
@@ -35,7 +42,7 @@ window.POW_CONFIG = Object.freeze({
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
 <style>
 :root{
   --bg:#0A0A0C; --panel:#141419; --panel2:#1C1C24; --line:#2A2A35;
@@ -282,6 +289,9 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
 .tip-link:hover{border-color:var(--acc2)}
 .tip-addr{font-family:'Chakra Petch',monospace;font-size:14px;color:var(--acc);word-break:break-all;
   background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;margin:8px 0;cursor:pointer;text-align:center}
+.faucet-banner{background:color-mix(in srgb,var(--hot) 16%,var(--panel));border:1px solid var(--hot);color:var(--hot);
+  border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:13px;font-weight:600;text-align:center}
+.faucet-banner.low{background:color-mix(in srgb,var(--acc2) 12%,var(--panel));border-color:var(--acc2);color:var(--acc2)}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -309,12 +319,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
   </div>
 
   <div class="tabview" id="tab-train">
+    <div class="faucet-banner" id="faucet-banner" style="display:none"></div>
     <div class="faucet-info">
       <div class="box"><b id="fi-perfect">+1</b><span id="fi-perfect-l"></span></div>
       <div class="box"><b id="fi-combo">x5</b><span id="fi-combo-l"></span></div>
       <div class="box"><b id="fi-goal">+21</b><span id="fi-goal-l"></span></div>
     </div>
     <button class="tip-link" id="tip-link" onclick="openTip()">💛 Support the project — send a tip ⚡</button>
+    <button class="tip-link" id="install-btn" onclick="installApp()" style="display:none">📲 Install PoW Coach — add to home screen</button>
     <div class="section-title" id="st-sports"></div>
     <div class="grid" id="sports-grid"></div>
     <div class="section-title" id="st-goals"></div>
@@ -506,6 +518,15 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
   </div>
 </div>
 
+<!-- ============ ONBOARDING (1re visite) ============ -->
+<div class="modal" id="modal-intro">
+  <div class="sheet">
+    <div class="reward-title" id="intro-title"></div>
+    <p class="reward-sub" id="intro-body"></p>
+    <div class="wk-actions"><button class="btn-acc" onclick="closeIntro()" id="intro-go" style="width:100%"></button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -538,7 +559,10 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   chalShareText:(t,e)=>`Je te défie : ${t} ${e} cette semaine sur PoW Coach ⚡`,
   chalImgTitle:"DÉFI DE LA SEMAINE", chalImgSub:"Relève-le sur PoW Coach ⚡",
   noSats:"Aucun sat à réclamer — au boulot ! 💪", minClaim:(n)=>`Minimum ${n} sats pour réclamer`, notCfg:"⚠ Faucet non configuré par le propriétaire",
-  capHit:"Plafond journalier atteint — reviens demain ⚡", capLock:(t)=>`Plafond de sats atteint 🔒 reviens dans ${t}`, err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
+  capHit:"Plafond journalier atteint — reviens demain ⚡", capLock:(t)=>`Plafond de sats atteint 🔒 reviens dans ${t}`,
+  introTitle:"⚡ Bienvenue sur PoW Coach", introBody:"Bouge ton corps, gagne des sats. La caméra compte tes répétitions et te récompense en vrais bitcoins ⚡. Connecte un wallet Lightning (bouton 👤) pour gagner et retirer. Gratuit, sans pub, sans inscription.", introGo:"C'est parti 💪",
+  faucetDry:"⚡ Faucet momentanément à sec — reviens bientôt 🙏", faucetLow:"⚡ Faucet bientôt vide",
+  err:"❌ ", errWithdraw:"LNbits inaccessible — extension Withdraw activée ?",
   loading:"⚡ Chargement du modèle IA…", alignPose:"Prends la position (imite la silhouette)", alignHold:"Ne bouge plus…", camOn:"📷 Activation caméra…", camFail:"⚠ Caméra inaccessible.\nAutorise la caméra (HTTPS requis).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats cette session`,
   combo:"COMBO", comboBroken:"COMBO PERDU",
@@ -575,7 +599,10 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   chalShareText:(t,e)=>`I challenge you: ${t} ${e} this week on PoW Coach ⚡`,
   chalImgTitle:"CHALLENGE OF THE WEEK", chalImgSub:"Take it on PoW Coach ⚡",
   noSats:"No sats to claim — get to work! 💪", minClaim:(n)=>`Minimum ${n} sats to claim`, notCfg:"⚠ Faucet not configured by owner",
-  capHit:"Daily cap reached — come back tomorrow ⚡", capLock:(t)=>`Sats cap reached 🔒 come back in ${t}`, err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
+  capHit:"Daily cap reached — come back tomorrow ⚡", capLock:(t)=>`Sats cap reached 🔒 come back in ${t}`,
+  introTitle:"⚡ Welcome to PoW Coach", introBody:"Move your body, earn sats. The camera counts your reps and rewards you in real Bitcoin ⚡. Connect a Lightning wallet (👤 button) to earn and withdraw. Free, no ads, no signup.", introGo:"Let's go 💪",
+  faucetDry:"⚡ Faucet temporarily dry — come back soon 🙏", faucetLow:"⚡ Faucet running low",
+  err:"❌ ", errWithdraw:"LNbits unreachable — is the Withdraw extension enabled?",
   loading:"⚡ Loading AI model…", alignPose:"Get into position (match the silhouette)", alignHold:"Hold still…", camOn:"📷 Starting camera…", camFail:"⚠ Camera unavailable.\nAllow camera access (HTTPS required).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats this session`,
   combo:"COMBO", comboBroken:"COMBO LOST",
@@ -612,7 +639,10 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   chalShareText:(t,e)=>`Te reto: ${t} ${e} esta semana en PoW Coach ⚡`,
   chalImgTitle:"RETO DE LA SEMANA", chalImgSub:"Acéptalo en PoW Coach ⚡",
   noSats:"Sin sats que reclamar — ¡a entrenar! 💪", minClaim:(n)=>`Mínimo ${n} sats para reclamar`, notCfg:"⚠ Faucet no configurado por el propietario",
-  capHit:"Límite diario alcanzado — vuelve mañana ⚡", capLock:(t)=>`Límite de sats alcanzado 🔒 vuelve en ${t}`, err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
+  capHit:"Límite diario alcanzado — vuelve mañana ⚡", capLock:(t)=>`Límite de sats alcanzado 🔒 vuelve en ${t}`,
+  introTitle:"⚡ Bienvenido a PoW Coach", introBody:"Mueve tu cuerpo, gana sats. La cámara cuenta tus repeticiones y te recompensa en bitcoin real ⚡. Conecta una wallet Lightning (botón 👤) para ganar y retirar. Gratis, sin anuncios, sin registro.", introGo:"¡Vamos! 💪",
+  faucetDry:"⚡ Faucet temporalmente sin fondos — vuelve pronto 🙏", faucetLow:"⚡ Faucet casi vacío",
+  err:"❌ ", errWithdraw:"LNbits inaccesible — ¿extensión Withdraw activada?",
   loading:"⚡ Cargando modelo IA…", alignPose:"Ponte en posición (imita la silueta)", alignHold:"No te muevas…", camOn:"📷 Activando cámara…", camFail:"⚠ Cámara no disponible.\nPermite la cámara (HTTPS requerido).",
   goalDone:(n)=>`✔ +${n} sats`, sessionSats:(n)=>`+${n} sats esta sesión`,
   combo:"COMBO", comboBroken:"COMBO PERDIDO",
@@ -977,7 +1007,7 @@ function applyLangStatic(){
 }
 window.openLang=()=>$('modal-lang').classList.add('show');
 window.setLang=l=>{S.lang=l;store.set('powlang',l);closeModal('modal-lang');
-  applyLangStatic();renderHome();say(L().voice.start,{force:true});};
+  applyLangStatic();renderHome();say(L().voice.start,{force:true});maybeIntro();};
 
 function renderHome(){
   ensureWeek();
@@ -1485,6 +1515,28 @@ function tipTick(){
 }
 setInterval(tipTick,60000);
 
+/* ---------- PWA : service worker + invite d'installation ---------- */
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; const b=$('install-btn'); if(b)b.style.display='block'; });
+window.installApp=async()=>{ if(!deferredPrompt)return; deferredPrompt.prompt(); try{await deferredPrompt.userChoice;}catch(e){} deferredPrompt=null; const b=$('install-btn'); if(b)b.style.display='none'; };
+window.addEventListener('appinstalled',()=>{ const b=$('install-btn'); if(b)b.style.display='none'; });
+
+/* ---------- état du faucet : bannière "à sec / bientôt vide" ---------- */
+async function checkFaucet(){
+  try{ const d=await (await fetch(API()+'/faucet')).json(); const b=$('faucet-banner'); if(!b)return;
+    if(d.dry){ b.textContent=L().faucetDry; b.className='faucet-banner'; b.style.display='block'; }
+    else if(d.low){ b.textContent=L().faucetLow; b.className='faucet-banner low'; b.style.display='block'; }
+    else b.style.display='none';
+  }catch(e){}
+}
+
+/* ---------- onboarding première visite ---------- */
+window.closeIntro=()=>{ store.set('powseen',1); closeModal('modal-intro'); };
+function maybeIntro(){ if(store.get('powseen'))return; const T=L();
+  $('intro-title').textContent=T.introTitle; $('intro-body').textContent=T.introBody; $('intro-go').textContent=T.introGo;
+  $('modal-intro').classList.add('show'); }
+
 /* =========================================================
    RETRAIT — Lightning Address (auto) ou LNURL-withdraw (QR)
    ========================================================= */
@@ -1815,8 +1867,9 @@ function importChallengeFromHash(){
 }
 
 /* ---------- init ---------- */
-ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();
-if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');}
+ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();
+if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');} // 1re visite : langue d'abord, l'intro suivra (setLang)
+else maybeIntro();
 </script>
 </body>
 </html>
