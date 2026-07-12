@@ -4,7 +4,7 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v2';
+const CACHE = 'powcoach-v3';
 const SHELL = ['/', '/index.html', '/manifest.json', '/vendor/qrcode.min.js',
   '/icon-192.png', '/icon-512.png'];
 
