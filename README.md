@@ -31,6 +31,11 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 - **📲 PWA installable** : `manifest.json` + service worker → « Ajouter à l'écran d'accueil », icône, plein écran, chargement instantané et tolérant au réseau (l'API n'est jamais mise en cache, le modèle de pose non plus). Bouton *Install* quand disponible.
 - **🚱 Bannière faucet** : quand le wallet faucet est bientôt vide (`low`) ou trop bas pour payer (`dry`), une bannière l'indique (utilisateurs **et** propriétaire). L'endpoint `GET /faucet` ne renvoie que des booléens (pas le solde exact). Un **pré-check** refuse proprement un retrait impossible au lieu d'une erreur brute.
 - **👋 Onboarding** : court écran d'accueil à la 1re visite (FR/EN/ES) expliquant gagner / connecter un wallet / retirer.
+- **🧾 Historique des retraits** : liste locale (30 derniers) dans l'onglet Stats.
+- **🎚️ Niveaux de difficulté** : Facile / Normal / Difficile ajustent le seuil « parfait » (`perfectThreshold()`), sélecteur sur l'onglet Entraînement.
+- **⏱️ Minuteur de repos** : modal 30/45/60/90 s avec vibration + voix à la fin (autonome, n'interfère pas avec la caméra).
+- **⚡ Zap d'un athlète** : si un athlète a publié son adresse Lightning (opt-in, celle de ses retraits), un bouton ⚡ sur sa ligne de classement ouvre le wallet pour le tipper.
+- **🔎 Transparence du faucet** : `GET /faucet` renvoie `todaySpent` + `dailyBudget` (agrégats, pas de données par-user) → carte « distribué aujourd'hui / budget » dans les Stats.
 - **Plafonds serveur** : max par retrait, budget global/jour, cap/IP anti-abus, et **plafond d'earn par compte avec cooldown** : une fois `SERVER_DAILY_CAP` (200 sats) gagnés, les gains sont **bloqués `EARN_COOLDOWN_H` heures (18 par défaut)** puis le compteur repart à zéro — imposé de façon **atomique dans le Durable Object**.
 - **Silhouette guide pleine** (corps lumineux + schéma de mouvement animé : flèches, cible d'impact, anneau de tenue) + **départ « de face »** (se placer face à la caméra suffit à armer le compte à rebours) + jauge d'alignement.
 - Modèle **full** + lissage temporel + anti-rebond pour un comptage précis.
