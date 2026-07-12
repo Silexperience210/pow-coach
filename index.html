@@ -379,6 +379,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     </div>
     <div id="board-list"></div>
     <button class="btn-acc board-publish" id="board-publish" onclick="publishScore()"></button>
+    <div class="section-title" id="st-runboard"></div>
+    <div id="runboard-list"></div>
   </div>
 
   <div class="tabview" id="tab-challenge" style="display:none">
@@ -496,7 +498,13 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
 .rs-splits-t{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 6px}
 .rs-split{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #ffffff10;font-size:14px}
 .rs-split b{color:#3DFFA0;font-family:'Chakra Petch',monospace}
-#rs-splits{max-height:180px;overflow-y:auto;margin-bottom:8px}
+#rs-splits{max-height:150px;overflow-y:auto;margin-bottom:8px}
+#rs-trace{width:100%;background:#050507;border:1px solid #ffffff14;border-radius:14px;margin-bottom:12px;display:block}
+.rb-item{display:flex;align-items:center;gap:10px;background:#ffffff08;border:1px solid #ffffff14;border-radius:12px;padding:9px 11px;margin-bottom:8px}
+.rb-item canvas{width:56px;height:56px;background:#050507;border-radius:9px;flex:0 0 auto}
+.rb-item .rbi{flex:1;min-width:0}
+.rb-item .rbi b{color:#3DFFA0;font-size:15px}
+.rb-item .rbi small{display:block;color:var(--dim);font-size:12px}
 </style>
 <div class="screen" id="screen-run">
   <div class="run-wrap">
@@ -532,6 +540,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
 <div class="modal" id="modal-runsummary">
   <div class="sheet">
     <h2 id="rs-title"></h2>
+    <canvas id="rs-trace" width="520" height="300"></canvas>
     <div class="rs-km-hero"><b id="rs-km">0.00</b><span id="rs-km-l">km</span></div>
     <div class="rs-grid">
       <div class="rs-cell"><b id="rs-time">—</b><span id="rs-time-l"></span></div>
@@ -542,9 +551,11 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
       <div class="rs-cell"><b id="rs-sats">⚡0</b><span id="rs-sats-l">sats</span></div>
     </div>
     <div id="rs-splits"></div>
+    <p class="hint" id="rs-privacy" style="text-align:center"></p>
+    <button class="btn-acc" onclick="publishRun()" id="rs-publish" style="width:100%;margin-bottom:8px"></button>
     <div class="wk-actions">
       <button class="btn-ghost" onclick="closeModal('modal-runsummary')" id="rs-close"></button>
-      <button class="btn-acc" onclick="shareRun()" id="rs-share"></button>
+      <button class="btn-ghost" onclick="shareRun()" id="rs-share"></button>
     </div>
   </div>
 </div>
@@ -555,6 +566,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;
     <h2 id="rc-title"></h2>
     <div class="field"><label id="rc-weight-l"></label><input id="rc-weight" type="number" min="30" max="200" inputmode="numeric"></div>
     <div class="field"><label id="rc-age-l"></label><input id="rc-age" type="number" min="10" max="99" inputmode="numeric"></div>
+    <div class="field"><label id="rc-relay-l"></label><input id="rc-relay" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="wss://relay.21pay.org"><p class="hint" id="rc-relay-hint"></p></div>
     <div class="wk-actions">
       <button class="btn-ghost" onclick="closeModal('modal-runcfg')" id="rc-close"></button>
       <button class="btn-acc" onclick="saveRunCfg()" id="rc-save"></button>
@@ -747,7 +759,8 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
     hrConnect:"Connecter cardio", hrUnsupported:"Bluetooth non supporté (Android Chrome requis)", hrOk:"Cardio connecté ❤️", hrFail:"Cardio non connecté",
     voiceKm:(n)=>`${n} kilomètre${n>1?'s':''} !`, voiceDone:(km)=>`Séance terminée. ${km} kilomètres. Bravo !`,
     gpxFail:"Fichier GPX illisible", gpxEmpty:"Aucun point GPS dans ce fichier", gpxBusy:"Termine la séance en cours d'abord", gpxOk:(km)=>`📁 Trace importée : ${km} km (visualisation, sans sats)`,
-    cfgTitle:"⚙ Profil sportif", weightL:"Poids (kg)", ageL:"Âge", summaryTitle:"🏁 Séance terminée", movingTime:"temps mobile", avgPace:"allure moy", bestKm:"meilleur km", calories:"calories", hr:"FC moy/max", splits:"Allure par km", share:"Partager", runsTitle:"🏃 Mes courses", runsEmpty:"Aucune course encore — lace tes baskets ! 👟", kmGoal:"Objectif km de la semaine !" } },
+    cfgTitle:"⚙ Profil sportif", weightL:"Poids (kg)", ageL:"Âge", summaryTitle:"🏁 Séance terminée", movingTime:"temps mobile", avgPace:"allure moy", bestKm:"meilleur km", calories:"calories", hr:"FC moy/max", splits:"Allure par km", share:"Partager", runsTitle:"🏃 Mes courses", runsEmpty:"Aucune course encore — lace tes baskets ! 👟", kmGoal:"Objectif km de la semaine !",
+    publishRun:"Publier sur Nostr", privacyNote:"🔒 Tracé anonymisé : forme seule, sans lieu ni carte (départ/arrivée masqués)", runboardTitle:"🗺️ Tracés récents (Nostr)", runboardEmpty:"Aucun tracé publié — sois le premier ⚡", relayL:"Relais Nostr perso (optionnel)", relayHint:"Ajouté aux relais par défaut (ex : relais 21pay). wss:// requis." } },
 en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your form live.",
   sports:"Disciplines", goals:"This week's goals", perfectL:"sat / perfect rep", comboL:"boosted combos", goalL:"sats / goal",
   reps:"reps", sec:"sec", hits:"hits", week:"this week", form:"FORM", stop:"■ Finish", cam:"⟳ Camera",
@@ -799,7 +812,8 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
     hrConnect:"Connect heart rate", hrUnsupported:"Bluetooth not supported (needs Android Chrome)", hrOk:"Heart rate connected ❤️", hrFail:"Heart rate not connected",
     voiceKm:(n)=>`${n} kilometer${n>1?'s':''}!`, voiceDone:(km)=>`Workout done. ${km} kilometers. Well done!`,
     gpxFail:"Unreadable GPX file", gpxEmpty:"No GPS points in this file", gpxBusy:"Finish the current session first", gpxOk:(km)=>`📁 Track imported: ${km} km (view only, no sats)`,
-    cfgTitle:"⚙ Athlete profile", weightL:"Weight (kg)", ageL:"Age", summaryTitle:"🏁 Workout done", movingTime:"moving time", avgPace:"avg pace", bestKm:"best km", calories:"calories", hr:"HR avg/max", splits:"Pace per km", share:"Share", runsTitle:"🏃 My runs", runsEmpty:"No run yet — lace up! 👟", kmGoal:"Weekly km goal reached!" } },
+    cfgTitle:"⚙ Athlete profile", weightL:"Weight (kg)", ageL:"Age", summaryTitle:"🏁 Workout done", movingTime:"moving time", avgPace:"avg pace", bestKm:"best km", calories:"calories", hr:"HR avg/max", splits:"Pace per km", share:"Share", runsTitle:"🏃 My runs", runsEmpty:"No run yet — lace up! 👟", kmGoal:"Weekly km goal reached!",
+    publishRun:"Publish to Nostr", privacyNote:"🔒 Anonymized route: shape only, no place or map (start/finish hidden)", runboardTitle:"🗺️ Recent routes (Nostr)", runboardEmpty:"No route published yet — be first ⚡", relayL:"Custom Nostr relay (optional)", relayHint:"Added to the default relays (e.g. 21pay relay). wss:// required." } },
 es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos en vivo.",
   sports:"Disciplinas", goals:"Objetivos de la semana", perfectL:"sat / gesto perfecto", comboL:"combos mejorados", goalL:"sats / objetivo",
   reps:"reps", sec:"seg", hits:"golpes", week:"esta semana", form:"FORMA", stop:"■ Terminar", cam:"⟳ Cámara",
@@ -851,7 +865,8 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
     hrConnect:"Conectar pulso", hrUnsupported:"Bluetooth no soportado (requiere Android Chrome)", hrOk:"Pulso conectado ❤️", hrFail:"Pulso no conectado",
     voiceKm:(n)=>`¡${n} kilómetro${n>1?'s':''}!`, voiceDone:(km)=>`Sesión terminada. ${km} kilómetros. ¡Bien hecho!`,
     gpxFail:"Archivo GPX ilegible", gpxEmpty:"Sin puntos GPS en el archivo", gpxBusy:"Termina la sesión actual primero", gpxOk:(km)=>`📁 Ruta importada: ${km} km (solo visual, sin sats)`,
-    cfgTitle:"⚙ Perfil deportivo", weightL:"Peso (kg)", ageL:"Edad", summaryTitle:"🏁 Sesión terminada", movingTime:"tiempo activo", avgPace:"ritmo medio", bestKm:"mejor km", calories:"calorías", hr:"FC med/máx", splits:"Ritmo por km", share:"Compartir", runsTitle:"🏃 Mis carreras", runsEmpty:"Sin carreras aún — ¡a correr! 👟", kmGoal:"¡Objetivo km semanal!" } }
+    cfgTitle:"⚙ Perfil deportivo", weightL:"Peso (kg)", ageL:"Edad", summaryTitle:"🏁 Sesión terminada", movingTime:"tiempo activo", avgPace:"ritmo medio", bestKm:"mejor km", calories:"calorías", hr:"FC med/máx", splits:"Ritmo por km", share:"Compartir", runsTitle:"🏃 Mis carreras", runsEmpty:"Sin carreras aún — ¡a correr! 👟", kmGoal:"¡Objetivo km semanal!",
+    publishRun:"Publicar en Nostr", privacyNote:"🔒 Ruta anonimizada: solo la forma, sin lugar ni mapa (inicio/fin ocultos)", runboardTitle:"🗺️ Rutas recientes (Nostr)", runboardEmpty:"Sin rutas publicadas — sé el primero ⚡", relayL:"Relé Nostr propio (opcional)", relayHint:"Añadido a los relés por defecto (ej: relé 21pay). wss:// requerido." } }
 };
 const VOICE_LANG = { fr:'fr-FR', en:'en-US', es:'es-ES' };
 
@@ -919,6 +934,9 @@ async function submitServerSession(){
   }catch(e){}
 }
 const DEFAULT_RELAYS=['wss://relay.damus.io','wss://nos.lol','wss://relay.primal.net','wss://nostr.bitcoiner.social'];
+// relais perso optionnel (ex: relais 21pay) ajouté à la liste de publication/lecture
+function RELAYS(){ const x=(store.get('powrelay','')||'').trim();
+  return x&&/^wss:\/\//.test(x)?DEFAULT_RELAYS.concat(x):DEFAULT_RELAYS; }
 
 /* ---------- stats à vie ---------- */
 function ensureStats(){
@@ -1645,7 +1663,7 @@ window.stopWorkout=()=>{S.running=false;S.phase='align';S.cdStarted=false;speech
    fréquents → combos). Cardio via Web Bluetooth (ceinture/bracelet BLE standard).
    ========================================================= */
 const R={map:null,tile:null,poly:null,marker:null,startMark:null,finishMark:null,running:false,follow:true,
-  pts:[],segLayers:[],kmPins:[],dist:0,tickedDist:0,combo:0,sats:0,speedEMA:0,lastPt:null,lastT:0,lastKm:0,
+  pts:[],trk:[],segLayers:[],kmPins:[],dist:0,tickedDist:0,combo:0,sats:0,speedEMA:0,lastPt:null,lastT:0,lastKm:0,
   sm:null,movingMs:0,splits:[],lastSplitMs:0,kcal:0,hrSum:0,hrN:0,hrMax:0,
   startTs:0,elapsed:0,watchId:null,timer:null,hr:null,hrDevice:null,lastRun:null};
 const RUN_KM_GOAL=20;                       // km/semaine → bonus hebdo (comme les reps)
@@ -1659,7 +1677,47 @@ function releaseWake(){ try{ wakeLock&&wakeLock.release(); }catch(e){} wakeLock=
 document.addEventListener('visibilitychange',()=>{ if(R.running && document.visibilityState==='visible') acquireWake(); });
 
 /* ---- couleur du tracé selon l'allure (bleu marche → rouge sprint) ---- */
-function paceColor(mps){ return mps<1.4?'#00D4FF':mps<2.2?'#3DFFA0':mps<3.3?'#B8FF29':mps<4.2?'#FFC531':'#FF6B00'; }
+const TRACE_COLORS=['#00D4FF','#3DFFA0','#B8FF29','#FFC531','#FF6B00'];
+function paceIdx(mps){ return mps<1.4?0:mps<2.2?1:mps<3.3?2:mps<4.2?3:4; }
+function paceColor(mps){ return TRACE_COLORS[paceIdx(mps)]; }
+/* Anonymise un tracé GPS → forme RELATIVE (0..1), nord en haut, proportions
+   réelles, SANS aucune coordonnée. Rogne ~100 m au départ ET à l'arrivée
+   (zone de confidentialité anti-"maison au point de départ"). Décime à ≤150 pts.
+   Sortie : [[x,y,idxAllure],…] — impossible d'en déduire un lieu. */
+function anonymizeTrack(trk){
+  if(!trk||trk.length<2)return [];
+  const la0=trk[0].la, ln0=trk[0].ln, mLng=Math.cos(la0*Math.PI/180)*111320, mLat=110540;
+  const pts=trk.map(p=>({x:(p.ln-ln0)*mLng, y:(p.la-la0)*mLat, c:paceIdx(p.v||0)}));
+  let cum=0; const cd=[0];
+  for(let i=1;i<pts.length;i++){ cum+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y); cd.push(cum); }
+  const total=cum, TRIM=100; let kept=pts;
+  if(total>4*TRIM) kept=pts.filter((p,i)=>cd[i]>=TRIM && cd[i]<=total-TRIM);
+  if(kept.length<2) kept=pts;
+  let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  for(const p of kept){ if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x; if(p.y<miny)miny=p.y; if(p.y>maxy)maxy=p.y; }
+  const scale=Math.max(1e-6,Math.max(maxx-minx,maxy-miny));
+  const step=Math.max(1,Math.ceil(kept.length/150)), out=[];
+  const enc=p=>[ +((p.x-minx)/scale).toFixed(3), +((maxy-p.y)/scale).toFixed(3), p.c ]; // flip Y = nord en haut
+  for(let i=0;i<kept.length;i+=step) out.push(enc(kept[i]));
+  out.push(enc(kept[kept.length-1]));
+  return out;
+}
+/* Dessine un tracé normalisé [[x,y,c],…] dans une boîte, colorié par allure. */
+function drawTrace(ctx, track, x0,y0,w,h, lw){
+  if(!track||track.length<2)return;
+  let minx=1,miny=1,maxx=0,maxy=0;
+  for(const p of track){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<miny)miny=p[1]; if(p[1]>maxy)maxy=p[1]; }
+  const bw=Math.max(1e-6,maxx-minx), bh=Math.max(1e-6,maxy-miny), pad=0.12;
+  const sc=Math.min(w*(1-pad)/bw, h*(1-pad)/bh);
+  const ox=x0+(w-bw*sc)/2-minx*sc, oy=y0+(h-bh*sc)/2-miny*sc;
+  ctx.lineWidth=lw||6; ctx.lineCap='round'; ctx.lineJoin='round';
+  for(let i=1;i<track.length;i++){ const a=track[i-1],b=track[i];
+    ctx.strokeStyle=TRACE_COLORS[b[2]||1];
+    ctx.beginPath(); ctx.moveTo(ox+a[0]*sc,oy+a[1]*sc); ctx.lineTo(ox+b[0]*sc,oy+b[1]*sc); ctx.stroke(); }
+  // point de départ (vert) + arrivée (rouge)
+  ctx.fillStyle='#3DFFA0'; ctx.beginPath(); ctx.arc(ox+track[0][0]*sc,oy+track[0][1]*sc,(lw||6)*1.1,0,7); ctx.fill();
+  const e=track[track.length-1]; ctx.fillStyle='#FF2244'; ctx.beginPath(); ctx.arc(ox+e[0]*sc,oy+e[1]*sc,(lw||6)*1.1,0,7); ctx.fill();
+}
 /* ---- zone de fréquence cardiaque (Karvonen simplifié, FCmax=220-âge) ---- */
 function hrZone(hr){ const p=hr/(220-runAge());
   if(p<0.6)return{c:'#8A8A99',z:'Z1'}; if(p<0.7)return{c:'#00D4FF',z:'Z2'};
@@ -1760,6 +1818,7 @@ function onRunPos(pos){
   const running=R.speedEMA>=2.2;
   R.movingMs+=dt*1000;                                        // temps EN MOUVEMENT seulement
   R.dist+=d;
+  if(R.trk.length<6000) R.trk.push({la:pt.lat,ln:pt.lng,v:R.speedEMA}); // pour le tracé (anonymisé au save)
   R.kcal+=runWeight()*(d/1000)*(running?0.95:0.5);           // kcal ≈ poids × km × facteur
   S.week.runKm=(S.week.runKm||0)+d/1000;                     // objectif hebdo course
   // tracé coloré par allure
@@ -1785,7 +1844,7 @@ function runStart(){
   if(!('geolocation' in navigator)){ toast(T.noGeo); return; }
   if(S.serverMode && S.token && earnLockLeft()>0){ toast(L().capLock(fmtDur(earnLockLeft()))); return; }
   ensureDay(); ensureWeek();
-  R.dist=0;R.tickedDist=0;R.combo=0;R.sats=0;R.pts=[];R.lastPt=null;R.sm=null;R.speedEMA=0;R.lastKm=0;
+  R.dist=0;R.tickedDist=0;R.combo=0;R.sats=0;R.pts=[];R.trk=[];R.lastPt=null;R.sm=null;R.speedEMA=0;R.lastKm=0;
   R.movingMs=0;R.splits=[];R.lastSplitMs=0;R.kcal=0;R.hrSum=0;R.hrN=0;R.hrMax=0;R.startTs=Date.now();R.running=true;
   S.sessionSats=0;
   runClearMap();                                    // repart d'une trace vierge
@@ -1820,7 +1879,8 @@ function saveRun(){
   const run={ t:Date.now(), km:+(R.dist/1000).toFixed(2), ms:R.movingMs, sats:R.sats,
     pace:avgPace, best:isFinite(best)?best:0, kcal:Math.round(R.kcal),
     hrAvg:R.hrN?Math.round(R.hrSum/R.hrN):0, hrMax:R.hrMax||0,
-    splits:R.splits.map(s=>({km:s.km,ms:s.ms})) };
+    splits:R.splits.map(s=>({km:s.km,ms:s.ms})),
+    track:anonymizeTrack(R.trk) };            // forme anonymisée (relative, sans géoloc)
   const l=store.get('powruns',[]); l.unshift(run); store.set('powruns',l.slice(0,30));
   const st=ensureStats(); st.runKm=+((st.runKm||0)+run.km).toFixed(2); store.set('powstats',st);
   persist();                                        // sauve S.week.runKm (objectif hebdo)
@@ -1924,6 +1984,11 @@ window.onGPXFile=onGPXFile;
 function showRunSummary(run){
   R.lastRun=run; const T=L().run;
   $('rs-title').textContent=T.summaryTitle;
+  const cv=$('rs-trace'), g=cv.getContext('2d'); g.clearRect(0,0,cv.width,cv.height);
+  if(run.track&&run.track.length>1){ cv.style.display='block'; drawTrace(g,run.track,0,0,cv.width,cv.height,5); }
+  else cv.style.display='none';
+  $('rs-privacy').textContent=T.privacyNote;
+  $('rs-publish').textContent='📡 '+T.publishRun; $('rs-publish').disabled=false;
   $('rs-km').textContent=run.km.toFixed(2); $('rs-km-l').textContent='km';
   const set=(id,v,l)=>{ $(id).textContent=v; $(id+'-l').textContent=l; };
   set('rs-time',fmtRunDur(run.ms),T.movingTime);
@@ -1953,21 +2018,29 @@ async function runImage(run){
   const W=1080,H=1080,cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
   const acc='#3DFFA0',T=L().run;
   x.fillStyle='#0A0A0C';x.fillRect(0,0,W,H);
-  const g=x.createRadialGradient(W/2,H*0.34,60,W/2,H*0.34,W*0.7);g.addColorStop(0,acc+'33');g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,W,H);
+  const g=x.createRadialGradient(W/2,H*0.30,60,W/2,H*0.30,W*0.75);g.addColorStop(0,acc+'22');g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,W,H);
   x.fillStyle='rgba(255,255,255,.02)';for(let y=0;y<H;y+=4)x.fillRect(0,y,W,2);
   x.strokeStyle=acc;x.lineWidth=6;x.strokeRect(40,40,W-80,H-80);
   x.textAlign='center';
-  x.fillStyle=acc;x.font='700 60px Chakra Petch, monospace';x.shadowColor=acc;x.shadowBlur=28;x.fillText('POW · COACH ⚡',W/2,170);x.shadowBlur=0;
-  x.fillStyle='#EDEDF2';x.font='700 40px Chakra Petch, monospace';x.fillText('🏃 '+T.title.toUpperCase(),W/2,300);
-  x.fillStyle=acc;x.font='700 200px Chakra Petch, monospace';x.shadowColor=acc;x.shadowBlur=40;x.fillText(run.km.toFixed(2),W/2,520);x.shadowBlur=0;
-  x.fillStyle='#8A8A99';x.font='600 44px Chakra Petch, monospace';x.fillText('KILOMÈTRES',W/2,585);
+  x.fillStyle=acc;x.font='700 56px Chakra Petch, monospace';x.shadowColor=acc;x.shadowBlur=26;x.fillText('POW · COACH ⚡',W/2,150);x.shadowBlur=0;
+  x.fillStyle='#EDEDF2';x.font='700 34px Chakra Petch, monospace';x.fillText('🏃 '+T.title.toUpperCase(),W/2,215);
+  const hasTrk=run.track&&run.track.length>1;
+  if(hasTrk){ x.shadowColor=acc;x.shadowBlur=16; drawTrace(x,run.track,140,255,800,405,12); x.shadowBlur=0;
+    x.fillStyle=acc;x.font='700 128px Chakra Petch, monospace';x.fillText(run.km.toFixed(2),W/2,792);
+    x.fillStyle='#8A8A99';x.font='600 34px Chakra Petch, monospace';x.fillText('KILOMÈTRES',W/2,840);
+  }else{
+    x.fillStyle=acc;x.font='700 200px Chakra Petch, monospace';x.shadowColor=acc;x.shadowBlur=40;x.fillText(run.km.toFixed(2),W/2,560);x.shadowBlur=0;
+    x.fillStyle='#8A8A99';x.font='600 44px Chakra Petch, monospace';x.fillText('KILOMÈTRES',W/2,625);
+  }
+  const yc=hasTrk?920:760, yl=hasTrk?958:800;
   const cells=[[fmtRunDur(run.ms),T.movingTime],[fmtPaceSpk(run.pace)+'/km',T.avgPace],['⚡'+run.sats,'sats']],cw=W/3;
   cells.forEach(([v,l],i)=>{ const cx=cw*i+cw/2;
-    x.fillStyle='#EDEDF2';x.font='700 52px Chakra Petch, monospace';x.fillText(v,cx,720);
-    x.fillStyle='#8A8A99';x.font='400 28px Rajdhani, sans-serif';x.fillText(String(l).toUpperCase(),cx,762); });
-  if(run.hrAvg){ x.fillStyle='#FF4FA3';x.font='600 38px Chakra Petch, monospace';x.fillText('❤️ '+run.hrAvg+'/'+run.hrMax+' bpm'+(run.kcal?' · 🔥 '+run.kcal+' kcal':''),W/2,850); }
-  else if(run.kcal){ x.fillStyle='#FFC531';x.font='600 40px Chakra Petch, monospace';x.fillText('🔥 '+run.kcal+' kcal',W/2,850); }
-  x.fillStyle=acc;x.font='700 38px Chakra Petch, monospace';x.fillText('pow-coach.pages.dev',W/2,H-90);
+    x.fillStyle='#EDEDF2';x.font='700 50px Chakra Petch, monospace';x.fillText(v,cx,yc);
+    x.fillStyle='#8A8A99';x.font='400 26px Rajdhani, sans-serif';x.fillText(String(l).toUpperCase(),cx,yl); });
+  if(run.hrAvg||run.kcal){ x.fillStyle=run.hrAvg?'#FF4FA3':'#FFC531';x.font='600 34px Chakra Petch, monospace';
+    x.fillText((run.hrAvg?'❤️ '+run.hrAvg+'/'+run.hrMax+' bpm':'')+(run.hrAvg&&run.kcal?' · ':'')+(run.kcal?'🔥 '+run.kcal+' kcal':''),W/2,hasTrk?1004:850); }
+  x.fillStyle='#8A8A99';x.font='400 24px Rajdhani, sans-serif';x.fillText('🔒 '+T.privacyNote.replace(/^🔒\s*/,''),W/2,hasTrk?1044:900);
+  x.fillStyle=acc;x.font='700 32px Chakra Petch, monospace';x.fillText('pow-coach.pages.dev',W/2,H-52);
   return await new Promise(r=>cv.toBlob(r,'image/png'));
 }
 window.showRunSummary=showRunSummary;
@@ -1987,11 +2060,65 @@ window.shareRun=async()=>{
 /* ---- profil sportif (poids/âge) pour calories + zones FC ---- */
 window.openRunCfg=()=>{ const T=L().run;
   $('rc-title').textContent=T.cfgTitle; $('rc-weight-l').textContent=T.weightL; $('rc-age-l').textContent=T.ageL;
+  $('rc-relay-l').textContent=T.relayL; $('rc-relay-hint').textContent=T.relayHint;
   $('rc-save').textContent=L().accSave; $('rc-close').textContent=L().cancel;
-  $('rc-weight').value=runWeight(); $('rc-age').value=runAge();
+  $('rc-weight').value=runWeight(); $('rc-age').value=runAge(); $('rc-relay').value=store.get('powrelay','');
   $('modal-runcfg').classList.add('show'); };
 window.saveRunCfg=()=>{ store.set('powweight',parseInt($('rc-weight').value,10)||70);
-  store.set('powage',parseInt($('rc-age').value,10)||30); closeModal('modal-runcfg'); toast(L().saved); };
+  store.set('powage',parseInt($('rc-age').value,10)||30);
+  let rl=($('rc-relay').value||'').trim(); if(rl&&!/^wss:\/\//.test(rl))rl=''; store.set('powrelay',rl);
+  closeModal('modal-runcfg'); toast(L().saved); };
+
+/* ---- Publier la course sur Nostr : forme ANONYMISÉE + métriques + sats.
+   Événement REMPLAÇABLE (kind 30078, d=powcoach-run) → 1 seul/personne, ne
+   s'accumule pas. Aucune coordonnée : seulement la forme relative. ---- */
+window.publishRun=async()=>{
+  const run=R.lastRun; if(!run)return; const T=L().run, Tb=L();
+  const btn=$('rs-publish'); btn.disabled=true; btn.textContent=Tb.publishing;
+  try{
+    const nick=S.nick||prompt(Tb.askNick)||('runner'+Math.floor(Math.random()*9999));
+    S.nick=nick.slice(0,20); store.set('pownick',S.nick);
+    const content=JSON.stringify({ km:run.km, ms:run.ms, sats:run.sats, pace:Math.round(run.pace),
+      kcal:run.kcal||0, hr:run.hrAvg||0, nick:S.nick, track:(run.track||[]).slice(0,300),
+      zap:(store.get('powlnaddr','')||undefined) });
+    const ev=await signEvent({ kind:30078, created_at:Math.floor(Date.now()/1000),
+      tags:[['d','powcoach-run'],['n',S.nick],['km',String(run.km)],['t','powcoachrun']], content });
+    let ok=0; await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
+    toast(ok?Tb.published(ok):Tb.pubFail); if(ok)loadRunBoard();
+  }catch(e){ toast(Tb.err+(e.message||'')); }
+  btn.disabled=false; btn.textContent='📡 '+T.publishRun;
+};
+async function loadRunBoard(){
+  const T=L().run, wrap=$('runboard-list'); if(!wrap)return;
+  const ttl=$('st-runboard'); if(ttl)ttl.textContent=T.runboardTitle;
+  const runs=new Map();
+  await Promise.all(RELAYS().map(r=>queryRunRelay(r,runs)));
+  const arr=[...runs.values()].sort((a,b)=>b.km-a.km).slice(0,30), myPub=store.get('pownostrpub','');
+  if(!arr.length){ wrap.innerHTML=`<p class="hint">${T.runboardEmpty}</p>`; return; }
+  wrap.innerHTML='';
+  arr.forEach(s=>{ const el=document.createElement('div'); el.className='rb-item'+(s.pub===myPub?' me':'');
+    const canZap=s.zap&&/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.zap)&&s.pub!==myPub;
+    el.innerHTML=`<canvas width="112" height="112"></canvas>
+      <div class="rbi"><b>${esc(s.nick||'anon')} · ${(+s.km).toFixed(2)} km</b>
+      <small>${fmtRunDur(s.ms)} · ${fmtPaceSpk(s.pace)}/km · ⚡${s.sats}${s.hr?' · ❤️'+s.hr:''}</small></div>
+      ${canZap?`<button class="zap" onclick="zapAthlete('${esc(s.zap)}')">⚡</button>`:''}`;
+    wrap.appendChild(el);
+    const cv=el.querySelector('canvas'); if(s.track&&s.track.length>1) drawTrace(cv.getContext('2d'),s.track,0,0,112,112,3);
+  });
+}
+function queryRunRelay(url,runs){ return new Promise((res)=>{
+  let ws;try{ws=new WebSocket(url);}catch(e){return res();}
+  const sub='pr'+Math.random().toString(36).slice(2,8);
+  const to=setTimeout(()=>{try{ws.close();}catch(e){}res();},4500);
+  ws.onopen=()=>ws.send(JSON.stringify(["REQ",sub,{kinds:[30078],"#t":["powcoachrun"],limit:100}]));
+  ws.onmessage=(m)=>{ try{const d=JSON.parse(m.data);
+    if(d[0]==='EVENT'){ const ev=d[2]; let data={}; try{data=JSON.parse(ev.content);}catch(e){}
+      const ts=ev.created_at||0, prev=runs.get(ev.pubkey);
+      if(!prev||ts>=prev.ts) runs.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,km:+data.km||0,ms:+data.ms||0,
+        pace:+data.pace||0,sats:+data.sats||0,hr:+data.hr||0,track:Array.isArray(data.track)?data.track.slice(0,300):[],zap:data.zap,ts});
+    } else if(d[0]==='EOSE'){ clearTimeout(to);try{ws.close();}catch(e){}res(); } }catch(e){} };
+  ws.onerror=()=>{clearTimeout(to);res();};
+}); }
 
 /* =========================================================
    COMPTE — LNURL-auth (connexion par signature wallet)
@@ -2326,7 +2453,7 @@ window.publishScore=async()=>{
       tags:[['d','powcoach-score'],['n',S.nick],['reps',String(st.totalReps)],['streak',String(st.streak)],['t','powcoach']],
       content:JSON.stringify({reps:st.totalReps,streak:st.streak,perfect:st.totalPerfect,nick:S.nick,zap:(store.get('powlnaddr','')||undefined)}) }); // zap: adresse LN opt-in (si renseignée)
     let ok=0;
-    await Promise.all(DEFAULT_RELAYS.map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
+    await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
     toast(ok?T.published(ok):T.pubFail);
     loadBoard(true);
   }catch(e){toast(T.err+(e.message||''));}
@@ -2344,7 +2471,8 @@ window.loadBoard=async(force)=>{
   if(!force && list.dataset.loaded){return;}
   list.innerHTML=`<p class="hint">${T.boardLoading}</p>`;
   const scores=new Map(); // pubkey -> {nick,reps,streak}
-  await Promise.all(DEFAULT_RELAYS.map(r=>queryRelay(r,scores)));
+  await Promise.all(RELAYS().map(r=>queryRelay(r,scores)));
+  loadRunBoard();                        // charge aussi les tracés de course publiés
   const arr=[...scores.values()].sort((a,b)=>b.reps-a.reps).slice(0,50);
   const myPub=store.get('pownostrpub','');
   list.innerHTML='';
