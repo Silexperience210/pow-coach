@@ -3,12 +3,14 @@
    Le front affiche le QR (lnurl) ; le wallet le scanne, signe k1, et appelle
    /auth/callback. Le front interroge /auth/poll?k1=... jusqu'à succès.
    Nécessite le binding KV "FAUCET_KV". */
-import { json, preflight, randHex, bech32Encode, cors } from "../_shared.js";
+import { json, preflight, randHex, bech32Encode, rateLimitKV, clientIp } from "../_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
 export async function onRequestGet({ request, env }) {
   if (!env.FAUCET_KV) return json({ error: "KV FAUCET_KV requis pour l'authentification" }, 500, env);
+  // anti-spam : 1 challenge / seconde / IP (chaque challenge écrit en KV)
+  if (!(await rateLimitKV(env, "ac:" + clientIp(request), 1000))) return json({ error: "Trop de requêtes" }, 429, env);
 
   const url = new URL(request.url);
   // "*" est valide pour le CORS mais pas comme origine d'URL de callback

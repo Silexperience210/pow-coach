@@ -2,7 +2,7 @@
    Appelé PAR LE WALLET de l'utilisateur (LUD-04).
    Vérifie que sig est une signature valide de k1 par key (secp256k1),
    puis marque le challenge comme authentifié et émet un token de session. */
-import { json, randHex, verifyAuthSig } from "../_shared.js";
+import { randHex, verifyAuthSig, rateLimitKV, clientIp } from "../_shared.js";
 
 // Ce endpoint répond au format LNURL (status OK/ERROR), pas au format de l'app
 function lnurlOk() { return new Response(JSON.stringify({ status: "OK" }), { headers: { "Content-Type": "application/json" } }); }
@@ -10,6 +10,8 @@ function lnurlErr(reason) { return new Response(JSON.stringify({ status: "ERROR"
 
 export async function onRequestGet({ request, env }) {
   if (!env.FAUCET_KV) return lnurlErr("KV manquant");
+  // anti-spam : la vérif secp256k1 (BigInt pur) coûte du CPU → 2 essais/s/IP max
+  if (!(await rateLimitKV(env, "cb:" + clientIp(request), 500))) return lnurlErr("Trop de requêtes");
   const u = new URL(request.url);
   const k1 = u.searchParams.get("k1");
   const sig = u.searchParams.get("sig");

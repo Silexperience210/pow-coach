@@ -199,7 +199,9 @@ export function bolt11AmountMsat(pr) {
     case "m": return n * 100000000n;
     case "u": return n * 100000n;
     case "n": return n * 100n;
-    case "p": return n / 10n; // pico : doit être un multiple de 10
+    case "p": // pico : doit être un multiple de 10 (sinon montant sub-msat → invalide)
+      if (n % 10n !== 0n) throw new Error("bad_invoice");
+      return n / 10n;
     default: throw new Error("bad_invoice");
   }
 }
@@ -411,6 +413,24 @@ const REP_MIN_MS = {
   run: 20000, // 1 tick = 100 m ; <20 s/100 m (>18 km/h soutenu) = véhicule/GPS → rejeté
 };
 export function repMinMs(exId) { return REP_MIN_MS[exId] || 600; }
+
+/* ---------- objectifs hebdo (source de vérité serveur) ----------
+   Miroir du catalogue client (champ `goal` de chaque exercice). `run` compte en
+   ticks de 100 m : 200 ticks = 20 km (RUN_KM_GOAL côté client). */
+const WEEKLY_GOALS = {
+  squat: 100, pushup: 60, lunge: 60, plank: 300, warrior: 120, tree: 120,
+  bridge: 80, jacks: 150, jsquat: 60, jab: 300, knee: 100, punch2: 300,
+  run: 200,
+};
+export function weeklyGoal(exId) { return WEEKLY_GOALS[exId] || 0; }
+// semaine ISO (même identifiant que le client, calé sur UTC côté serveur)
+export function isoWeek(d = new Date()) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return t.getUTCFullYear() + "-W" + Math.ceil((((t - y0) / 864e5) + 1) / 7);
+}
 function parseTiers(env) {
   // "5:2,10:3,21:5" → [[5,2],[10,3],[21,5]] ; défaut = config client
   const raw = env.COMBO_TIERS;
@@ -436,10 +456,12 @@ export function validateRepLog(env, exId, startTs, now, reps) {
     .filter((r) => r && Number.isFinite(Number(r.t)))
     .sort((a, b) => Number(a.t) - Number(b.t));
   let combo = 0, sats = 0, valid = 0, lastT = -Infinity;
+  const intervals = [];
   for (const r of sorted) {
     const t = Number(r.t);
     if (t < startTs - slack || t > now + slack) continue; // hors fenêtre de session
     if (t - lastT < min) continue; // trop rapide pour être humain → ignoré
+    if (Number.isFinite(lastT)) intervals.push(t - lastT);
     lastT = t; valid++;
     const form = Math.max(0, Math.min(100, Number(r.form) || 0));
     if (form >= PT) {
@@ -453,6 +475,18 @@ export function validateRepLog(env, exId, startTs, now, reps) {
       // sans combo — parité avec le client ("la marche paie moins que la course")
       if (exId === "run") sats += base;
     }
+  }
+  // anti-farming "métronome" : ≥ N reps à intervalle quasi CONSTANT (CV < seuil)
+  // = script/rejeu, pas un humain (le bruit moteur humain dépasse largement 5 %).
+  // Exemptés : la course (allure régulière légitime) et les tenues (ticks émis
+  // à la seconde par construction → uniformes par design).
+  const UNIFORM_EXEMPT = new Set(["run", "plank", "warrior", "tree"]);
+  const minN = parseInt(env.UNIFORM_MIN_REPS || "20", 10);
+  const maxCv = parseFloat(env.UNIFORM_CV || "0.05");
+  if (!UNIFORM_EXEMPT.has(exId) && minN > 0 && intervals.length >= minN) {
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const sd = Math.sqrt(intervals.reduce((a, b) => a + (b - mean) ** 2, 0) / intervals.length);
+    if (mean > 0 && sd / mean < maxCv) return { valid, sats: 0, uniform: true };
   }
   return { valid, sats };
 }

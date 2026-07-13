@@ -4,8 +4,8 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v5';
-const SHELL = ['/', '/index.html', '/manifest.json', '/vendor/qrcode.min.js',
+const CACHE = 'powcoach-v6';
+const SHELL = ['/', '/index.html', '/app.js', '/app.css', '/manifest.json', '/vendor/qrcode.min.js',
   '/vendor/leaflet.js', '/vendor/leaflet.css', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -41,6 +41,12 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(req)
       .then((r) => cachePut('/', r))
       .catch(() => caches.match('/').then((m) => m || caches.match('/index.html'))));
+    return;
+  }
+  // shell applicatif (app.js / app.css) : réseau d'abord — une mise à jour de
+  // l'app doit arriver sans attendre une nouvelle version du service worker
+  if (sameOrigin && (url.pathname === '/app.js' || url.pathname === '/app.css')) {
+    e.respondWith(fetch(req).then((r) => cachePut(req, r)).catch(() => caches.match(req)));
     return;
   }
   // statique même origine : cache d'abord
