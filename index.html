@@ -1737,11 +1737,14 @@ function fmtRunDur(ms){const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/36
   return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(ss).padStart(2,'0');}
 function comboSatsFor(n){let s=CFG.SATS_PERFECT;for(const t of CFG.COMBO_TIERS)if(n>=t.at)s=t.sats;return s;}
 
+/* ⚠ Dans ce module, `L` est le helper i18n (const L=()=>I18N[...]) qui MASQUE le
+   global Leaflet. On passe donc par `window.L` (alias LF) pour toute la carto. */
+const LF=()=>window.L;
 function runInitMap(){
-  if(R.map||typeof L==='undefined')return;
-  R.map=L.map('run-map',{zoomControl:true,attributionControl:true}).setView([48.8566,2.3522],13);
+  if(R.map||!LF())return;
+  R.map=LF().map('run-map',{zoomControl:true,attributionControl:true}).setView([48.8566,2.3522],13);
   // fond sombre (CARTO dark) assorti au thème néon ; données © OpenStreetMap
-  R.tile=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  R.tile=LF().tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
     {maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(R.map);
   R.map.on('dragstart',()=>{R.follow=false;});
 }
@@ -1755,7 +1758,7 @@ function runClearMap(){
 }
 function runMarker(lat,lng,center){
   if(!R.map)return;
-  if(!R.marker)R.marker=L.circleMarker([lat,lng],{radius:7,color:'#fff',weight:3,fillColor:'#3DFFA0',fillOpacity:1}).addTo(R.map);
+  if(!R.marker)R.marker=LF().circleMarker([lat,lng],{radius:7,color:'#fff',weight:3,fillColor:'#3DFFA0',fillOpacity:1}).addTo(R.map);
   else R.marker.setLatLng([lat,lng]);
   if(center)R.map.setView([lat,lng],16);
 }
@@ -1805,7 +1808,7 @@ function onRunPos(pos){
   pill.textContent=T.gpsOk; pill.className='run-gpspill ok';
   if(!R.lastPt){
     R.lastPt=pt; R.lastT=now;
-    if(R.map){ R.startMark=L.circleMarker([pt.lat,pt.lng],{radius:8,color:'#fff',weight:3,fillColor:'#3DFFA0',fillOpacity:1}).addTo(R.map); R.map.setView([pt.lat,pt.lng],17); }
+    if(R.map){ R.startMark=LF().circleMarker([pt.lat,pt.lng],{radius:8,color:'#fff',weight:3,fillColor:'#3DFFA0',fillOpacity:1}).addTo(R.map); R.map.setView([pt.lat,pt.lng],17); }
     runMarker(pt.lat,pt.lng,false); return;
   }
   const dt=(now-R.lastT)/1000; if(dt<=0)return;
@@ -1822,14 +1825,14 @@ function onRunPos(pos){
   R.kcal+=runWeight()*(d/1000)*(running?0.95:0.5);           // kcal ≈ poids × km × facteur
   S.week.runKm=(S.week.runKm||0)+d/1000;                     // objectif hebdo course
   // tracé coloré par allure
-  if(R.map){ const seg=L.polyline([[R.lastPt.lat,R.lastPt.lng],[pt.lat,pt.lng]],{color:paceColor(R.speedEMA),weight:5,opacity:.92}).addTo(R.map); R.segLayers.push(seg); }
+  if(R.map){ const seg=LF().polyline([[R.lastPt.lat,R.lastPt.lng],[pt.lat,pt.lng]],{color:paceColor(R.speedEMA),weight:5,opacity:.92}).addTo(R.map); R.segLayers.push(seg); }
   runMarker(pt.lat,pt.lng,false); if(R.follow&&R.map)R.map.panTo([pt.lat,pt.lng]);
   R.lastPt=pt; R.lastT=now;
   while(R.dist-R.tickedDist>=100){ R.tickedDist+=100; runTick(running); }   // 1 tick / 100 m
   const km=Math.floor(R.dist/1000);
   if(km>R.lastKm){
     const splitMs=R.movingMs-R.lastSplitMs; R.lastSplitMs=R.movingMs; R.splits.push({km,ms:splitMs}); R.lastKm=km;
-    if(R.map){ const pin=L.marker([pt.lat,pt.lng],{icon:L.divIcon({className:'km-pin',html:String(km),iconSize:[24,24]})}).addTo(R.map); R.kmPins.push(pin); }
+    if(R.map){ const pin=LF().marker([pt.lat,pt.lng],{icon:LF().divIcon({className:'km-pin',html:String(km),iconSize:[24,24]})}).addTo(R.map); R.kmPins.push(pin); }
     say(T.voiceKm(km),{force:true}); if(navigator.vibrate)navigator.vibrate([60,40,60]);
     checkRunGoal();
   }
@@ -1865,7 +1868,7 @@ function runStop(){
   if(R.watchId!=null){ navigator.geolocation.clearWatch(R.watchId); R.watchId=null; }
   if(R.timer){ clearInterval(R.timer); R.timer=null; }
   submitServerSession();                            // le serveur recalcule et crédite
-  if(R.map && R.lastPt) R.finishMark=L.circleMarker([R.lastPt.lat,R.lastPt.lng],{radius:8,color:'#fff',weight:3,fillColor:'#FF2244',fillOpacity:1}).addTo(R.map);
+  if(R.map && R.lastPt) R.finishMark=LF().circleMarker([R.lastPt.lat,R.lastPt.lng],{radius:8,color:'#fff',weight:3,fillColor:'#FF2244',fillOpacity:1}).addTo(R.map);
   const T=L().run, km=(R.dist/1000).toFixed(2);
   $('run-btn').textContent='▶ '+T.start; $('run-btn').className='run-start';
   $('run-gpspill').textContent='🏁 '+km+' km · ⚡'+R.sats; $('run-gpspill').className='run-gpspill ok';
@@ -1966,7 +1969,7 @@ function parseGPX(text){
   runInitMap(); if(R.map)R.map.invalidateSize();
   runClearMap();
   R.pts=pts.map(p=>[p.lat,p.lng]);
-  R.poly=L.polyline(R.pts,{color:'#FFC531',weight:5,opacity:.92}).addTo(R.map); // trace importée = or
+  R.poly=LF().polyline(R.pts,{color:'#FFC531',weight:5,opacity:.92}).addTo(R.map); // trace importée = or
   runMarker(pts[pts.length-1].lat,pts[pts.length-1].lng,false);
   R.follow=false;
   try{ R.map.fitBounds(R.poly.getBounds(),{padding:[30,30]}); }catch(e){}
@@ -2040,7 +2043,7 @@ async function runImage(run){
   if(run.hrAvg||run.kcal){ x.fillStyle=run.hrAvg?'#FF4FA3':'#FFC531';x.font='600 34px Chakra Petch, monospace';
     x.fillText((run.hrAvg?'❤️ '+run.hrAvg+'/'+run.hrMax+' bpm':'')+(run.hrAvg&&run.kcal?' · ':'')+(run.kcal?'🔥 '+run.kcal+' kcal':''),W/2,hasTrk?1004:850); }
   x.fillStyle='#8A8A99';x.font='400 24px Rajdhani, sans-serif';x.fillText('🔒 '+T.privacyNote.replace(/^🔒\s*/,''),W/2,hasTrk?1044:900);
-  x.fillStyle=acc;x.font='700 32px Chakra Petch, monospace';x.fillText('pow-coach.pages.dev',W/2,H-52);
+  x.fillStyle=acc;x.font='700 32px Chakra Petch, monospace';x.fillText(location.host,W/2,H-52);
   return await new Promise(r=>cv.toBlob(r,'image/png'));
 }
 window.showRunSummary=showRunSummary;
@@ -2101,7 +2104,8 @@ async function loadRunBoard(){
     el.innerHTML=`<canvas width="112" height="112"></canvas>
       <div class="rbi"><b>${esc(s.nick||'anon')} · ${(+s.km).toFixed(2)} km</b>
       <small>${fmtRunDur(s.ms)} · ${fmtPaceSpk(s.pace)}/km · ⚡${s.sats}${s.hr?' · ❤️'+s.hr:''}</small></div>
-      ${canZap?`<button class="zap" onclick="zapAthlete('${esc(s.zap)}')">⚡</button>`:''}`;
+      ${canZap?`<button class="zap">⚡</button>`:''}`;
+    if(canZap) el.querySelector('.zap').addEventListener('click',()=>zapAthlete(s.zap)); // anti-XSS : pas de données Nostr en onclick inline
     wrap.appendChild(el);
     const cv=el.querySelector('canvas'); if(s.track&&s.track.length>1) drawTrace(cv.getContext('2d'),s.track,0,0,112,112,3);
   });
@@ -2389,7 +2393,10 @@ function renderStats(){
   renderRuns(); renderClaims(); renderTransparency(S.faucetData); checkFaucet(); // courses + retraits + transparence
 }
 function drawBars(cv,labels,vals){
-  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||cv.parentElement.clientWidth-28, H=cv.height;
+  // hauteur LOGIQUE mémorisée : cv.height est réécrit en pixels physiques (×dpr)
+  // au 1er rendu, la relire ferait gonfler le canvas à chaque affichage des Stats
+  if(!cv.dataset.h)cv.dataset.h=cv.height;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||cv.parentElement.clientWidth-28, H=+cv.dataset.h;
   cv.width=W*dpr;cv.height=H*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
   if(!x.roundRect)x.roundRect=(a,b,w,h,r)=>{x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);
     x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();};
@@ -2480,10 +2487,12 @@ window.loadBoard=async(force)=>{
   arr.forEach((s,i)=>{ const row=document.createElement('div');
     row.className='board-row'+(i<3?' top'+(i+1):'')+(s.pub===myPub?' me':'');
     const canZap = s.zap && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.zap) && s.pub!==myPub;
-    const zapBtn = canZap ? `<button class="zap" title="${T.zapTip}" onclick="zapAthlete('${esc(s.zap)}')">⚡</button>` : '';
+    const zapBtn = canZap ? `<button class="zap" title="${T.zapTip}">⚡</button>` : '';
     row.innerHTML=`<div class="rank">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div>
       <div class="who"><b>${esc(s.nick||'anon')}</b><small>${s.pub.slice(0,12)}…</small></div>
       <div class="score">${s.reps} reps${s.streak>1?' · 🔥'+s.streak:''}</div>${zapBtn}`;
+    // listener programmatique (jamais de données Nostr dans un onclick inline → anti-XSS)
+    if(canZap) row.querySelector('.zap').addEventListener('click',()=>zapAthlete(s.zap));
     list.appendChild(row); });
   list.dataset.loaded='1';
 };
@@ -2495,14 +2504,14 @@ function queryRelay(url,scores){ return new Promise((res)=>{
   ws.onmessage=(m)=>{ try{const d=JSON.parse(m.data);
     if(d[0]==='EVENT'){ const ev=d[2]; let data={};
       try{data=JSON.parse(ev.content);}catch(e){}
-      const reps=parseInt(data.reps||0,10);
+      const reps=parseInt(data.reps,10)||0;
       const ts=ev.created_at||0; // "dernier publié fait foi" : on garde l'événement le plus récent
       const prev=scores.get(ev.pubkey);
-      if(!prev||ts>=prev.ts) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak||0,10),zap:data.zap,ts});
+      if(!prev||ts>=prev.ts) scores.set(ev.pubkey,{pub:ev.pubkey,nick:data.nick,reps,streak:parseInt(data.streak,10)||0,zap:data.zap,ts});
     } else if(d[0]==='EOSE'){ clearTimeout(to);try{ws.close();}catch(e){}res(); } }catch(e){} };
   ws.onerror=()=>{clearTimeout(to);res();};
 }); }
-const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const esc=s=>String(s||'').replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
 
 /* =========================================================
    DÉFIS HEBDO PARTAGEABLES — lien + image générée
@@ -2595,7 +2604,7 @@ async function challengeImage(exName,target,T){
   x.fillText(T.chalImgSub,W/2,760);
   // pied
   x.fillStyle=acc;x.font='700 40px Chakra Petch, monospace';
-  x.fillText('coachsats.pages.dev',W/2,H-100);
+  x.fillText(location.host,W/2,H-100);
   return await new Promise(r=>cv.toBlob(r,'image/png'));
 }
 // import d'un défi via lien (#chal=...)

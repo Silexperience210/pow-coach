@@ -11,7 +11,8 @@ export async function onRequestGet({ request, env }) {
   if (!env.FAUCET_KV) return json({ error: "KV FAUCET_KV requis pour l'authentification" }, 500, env);
 
   const url = new URL(request.url);
-  const origin = env.ALLOWED_ORIGIN || url.origin;
+  // "*" est valide pour le CORS mais pas comme origine d'URL de callback
+  const origin = (env.ALLOWED_ORIGIN && env.ALLOWED_ORIGIN !== "*") ? env.ALLOWED_ORIGIN : url.origin;
   const k1 = randHex(32);
 
   // URL de callback que le wallet appellera

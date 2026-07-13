@@ -4,7 +4,7 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v4';
+const CACHE = 'powcoach-v5';
 const SHELL = ['/', '/index.html', '/manifest.json', '/vendor/qrcode.min.js',
   '/vendor/leaflet.js', '/vendor/leaflet.css', '/icon-192.png', '/icon-512.png'];
 
@@ -32,23 +32,25 @@ self.addEventListener('fetch', (e) => {
   // tuiles carto (CARTO dark / OSM) : réseau direct (évite de saturer le cache pendant une course)
   if (url.hostname === 'tile.openstreetmap.org' || url.hostname.endsWith('basemaps.cartocdn.com')) return;
 
+  // on ne met en cache que les réponses saines (jamais un 404/500 transitoire) ;
+  // les réponses opaques (no-cors, ex. Google Fonts) restent cachables pour l'offline
+  const cachePut = (key, r) => { if (r && (r.ok || r.type === 'opaque')) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(key, cp)); } return r; };
+
   // navigation : réseau d'abord, repli cache
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req)
-      .then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put('/', cp)); return r; })
+      .then((r) => cachePut('/', r))
       .catch(() => caches.match('/').then((m) => m || caches.match('/index.html'))));
     return;
   }
   // statique même origine : cache d'abord
   if (sameOrigin) {
-    e.respondWith(caches.match(req).then((m) => m || fetch(req).then((r) => {
-      const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); return r;
-    })));
+    e.respondWith(caches.match(req).then((m) => m || fetch(req).then((r) => cachePut(req, r))));
     return;
   }
   // CDN : stale-while-revalidate
   e.respondWith(caches.match(req).then((m) => {
-    const f = fetch(req).then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); return r; }).catch(() => m);
+    const f = fetch(req).then((r) => cachePut(req, r)).catch(() => m);
     return m || f;
   }));
 });

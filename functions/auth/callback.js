@@ -26,6 +26,10 @@ export async function onRequestGet({ request, env }) {
   // k1 doit être un hex 32 octets (anti-injection)
   if (!/^[0-9a-f]{64}$/i.test(k1)) return lnurlErr("k1 invalide");
 
+  // key = clé publique secp256k1 (compressée 33 o ou non compressée 65 o) : on
+  // valide le format avant de l'adopter comme identité de session
+  if (!/^(0[23][0-9a-f]{64}|04[0-9a-f]{128})$/i.test(key)) return lnurlErr("Clé publique invalide");
+
   // vérification cryptographique de la signature
   if (!verifyAuthSig(k1, sig, key)) return lnurlErr("Signature invalide");
 

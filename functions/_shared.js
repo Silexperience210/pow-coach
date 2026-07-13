@@ -449,6 +449,9 @@ export function validateRepLog(env, exId, startTs, now, reps) {
       sats += s;
     } else {
       combo = 0;
+      // course/marche : un tick "marche" (form < seuil) paie le tarif de base,
+      // sans combo — parité avec le client ("la marche paie moins que la course")
+      if (exId === "run") sats += base;
     }
   }
   return { valid, sats };
