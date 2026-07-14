@@ -58,17 +58,32 @@ test("buildMessages : langue inconnue → repli fr", () => {
 
 test("llmChat : appelle un endpoint OpenAI-compatible et extrait le texte", async () => {
   let captured;
-  const fakeFetch = async (url, opts) => {
-    captured = { url, body: JSON.parse(opts.body), auth: opts.headers.Authorization };
+  const fakeFetch = async (url, opts, ms) => {
+    captured = { url, body: JSON.parse(opts.body), auth: opts.headers.Authorization, ms };
     return { ok: true, json: async () => ({ choices: [{ message: { content: "  Bravo !  " } }] }) };
   };
-  const env = { KIMI_API_KEY: "sk-test", KIMI_URL: "https://api.moonshot.ai/v1/", KIMI_MODEL: "kimi-2.6" };
+  const env = { KIMI_API_KEY: "sk-test", KIMI_URL: "https://api.moonshot.ai/v1/" };
   const text = await llmChat(env, [{ role: "user", content: "x" }], 100, fakeFetch);
   assert.equal(text, "Bravo !");
   assert.equal(captured.url, "https://api.moonshot.ai/v1/chat/completions");
-  assert.equal(captured.body.model, "kimi-2.6");
-  assert.equal(captured.body.max_tokens, 100);
+  assert.equal(captured.body.model, "kimi-k2.6"); // défaut
   assert.equal(captured.auth, "Bearer sk-test");
+  // règles kimi-k2.6 validées en réel : thinking désactivé → temperature 0.6
+  assert.deepEqual(captured.body.thinking, { type: "disabled" });
+  assert.equal(captured.body.temperature, 0.6);
+  assert.equal(captured.body.max_tokens, 100);
+  assert.equal(captured.ms, 25000);
+});
+
+test("llmChat : KIMI_THINKING=1 → temperature 1, gros budget tokens, long timeout", async () => {
+  let captured;
+  const fakeFetch = async (url, opts, ms) => { captured = { body: JSON.parse(opts.body), ms };
+    return { ok: true, json: async () => ({ choices: [{ message: { content: "ok" } }] }) }; };
+  await llmChat({ KIMI_API_KEY: "k", KIMI_THINKING: "1" }, [], 300, fakeFetch);
+  assert.equal(captured.body.temperature, 1);          // exigé par le mode raisonnement
+  assert.equal(captured.body.thinking, undefined);
+  assert.ok(captured.body.max_tokens >= 2048);          // le raisonnement consomme ~1000 tokens
+  assert.equal(captured.ms, 110000);
 });
 
 test("llmChat : erreur HTTP ou réponse vide → throw", async () => {

@@ -48,7 +48,7 @@ Cloudflare redéploie **automatiquement à chaque `git push`**, avec previews pa
 | `ANON_DAILY_CAP` | Plaintext | `100` (cap/jour **par IP** sans login ; défaut = `MAX_CLAIM_SATS`) |
 | `REQUIRE_AUTH` | Plaintext | `0` (ou `1` pour forcer la connexion) |
 | `KIMI_API_KEY` | **Encrypt 🔒** | clé API Moonshot/Kimi — active le **coach IA** (facultatif) |
-| `KIMI_MODEL` | Plaintext | id du modèle Kimi (celui de ton dashboard, ex. ta version 2.6) |
+| `KIMI_MODEL` | Plaintext | défaut `kimi-k2.6` — rien à mettre si c'est le modèle voulu |
 | `COACH_DAILY_CAP` | Plaintext | `15` (appels coach IA/jour/compte) |
 
 ## KV (obligatoire — auth, budgets, cap/IP)

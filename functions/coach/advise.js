@@ -55,8 +55,9 @@ export async function onRequestPost({ request, env }) {
   if (!messages) return json({ error: "Résumé de séance invalide" }, 400, env);
 
   try {
-    const text = await llmChat(env, messages, type === "plan" ? 500 : 260,
-      (url, opts) => tfetch(url, opts, 25000));
+    // le timeout est choisi par llmChat selon le mode (25 s, ou 110 s en mode raisonnement)
+    const text = await llmChat(env, messages, type === "plan" ? 500 : 300,
+      (url, opts, ms) => tfetch(url, opts, ms));
     return json({ text, type }, 200, env);
   } catch (e) {
     return json({ error: "Coach injoignable — réessaie dans un instant" }, 502, env);
