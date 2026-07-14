@@ -1,5 +1,50 @@
 # 🔧 PoW Coach — correctifs sécurité & bugs
 
+## 🚀 Revue 2026-07 (branche `claude/repo-review-suggestions`)
+
+### Corrigé
+1. **Carte Leaflet jamais affichée (mode Course)** — `app.js` : le helper i18n `const L`
+   masquait le global Leaflet `L` dans le module ; toute la carto passe par `window.L` (alias `LF()`).
+2. **XSS stocké via le champ `zap` des événements Nostr** — `app.js` : plus aucune donnée
+   Nostr dans un `onclick` inline (listeners programmatiques) + `esc()` échappe `'`.
+3. **Marche payée 0 sat en scoring serveur** — `_shared.js` : un tick « marche » paie le tarif
+   de base (parité client, « la marche paie moins que la course »).
+4. **Graphique 7 jours qui gonflait à chaque affichage** (écrans retina) — hauteur logique mémorisée.
+5. **SW : les 404/500 transitoires étaient cachés pour toujours** — seules les réponses saines
+   (ou opaques no-cors) sont mises en cache.
+6. **`/auth/callback`** : format de la pubkey validé avant adoption comme identité ;
+   **`/auth/challenge`** : URL de callback correcte même si `ALLOWED_ORIGIN="*"`.
+
+### Nouveau
+- **Bonus hebdo crédité côté serveur** : compteur par (compte, exercice, semaine ISO) dans le
+  Durable Object, bonus `SATS_WEEKLY_GOAL` versé une seule fois au franchissement de l'objectif.
+- **Anti-farming « métronome »** : ≥ 20 reps à intervalle quasi constant (CV < 5 %) → 0 sat
+  (course et tenues exemptées ; réglable via `UNIFORM_MIN_REPS` / `UNIFORM_CV`).
+- **Vérification des événements Nostr à la lecture** (id NIP-01 + signature Schnorr) : un relay
+  menteur ne peut plus usurper un score du leaderboard.
+- **Rate-limit sur `/auth/challenge` (1/s/IP) et `/auth/callback` (2/s/IP)**.
+- **bolt11 : rejet des montants pico non multiples de 10** (au lieu d'une troncature silencieuse).
+- **Découpage d'`index.html`** (2 627 → ~380 lignes) : `app.js` + `app.css`, précachés par le SW
+  et servis en réseau-d'abord + `Cache-Control: no-cache` (les mises à jour arrivent sans
+  attendre une nouvelle version du SW).
+- **Tests unitaires** (`npm test`, `node --test`, zéro dépendance) sur `_shared.js` :
+  secp256k1/LNURL-auth, bech32, bolt11, `validateRepLog`. **CI sur toutes les branches.**
+
+### Publication Nostr fiabilisée (diagnostic « je n'arrive pas à publier mon parcours »)
+- **noble (secp256k1/Schnorr) auto-hébergé** dans `vendor/noble-secp256k1.js` (bundle
+  `@noble/curves@1.8.1`, vérifié croisé contre npm) : la signature ne charge plus rien
+  depuis jsdelivr au moment de publier — les réseaux/navigateurs qui bloquent le CDN
+  (DNS filtrant, Brave…) cassaient la publication alors que le partage local marchait.
+  Précaché par le SW → signature possible hors-ligne.
+- **`publishTo` durci** : un `["OK", id, false, raison]` (NIP-20) n'est plus compté comme
+  succès ; timeout 4 s → 8 s (handshakes mobiles) ; en cas d'échec total, le toast affiche
+  la **raison renvoyée par le relay** au lieu d'un message générique.
+- **`nostr.bitcoiner.social` retiré des relays par défaut** (timeout systématique aux EVENT,
+  constaté au test) → remplacé par `offchain.pub` (accepte kind 30078, testé avec un tracé
+  complet de 300 points).
+
+---
+
 Correctifs appliqués sur cette version (par rapport au bundle d'origine).
 
 ## 🔴 Critique

@@ -3,7 +3,7 @@
    (plausibilité + combos), RECALCULE les sats, et crédite le solde du compte
    dans le Durable Object (usage unique via le sid → pas de rejeu).
    Le montant réclamé par le client est ignoré : seul le score serveur compte. */
-import { json, preflight, originOk, verifySession, validateRepLog, ledgerCredit, rateLimitKV, clientIp } from "../_shared.js";
+import { json, preflight, originOk, verifySession, validateRepLog, ledgerCredit, rateLimitKV, clientIp, weeklyGoal, isoWeek } from "../_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
@@ -39,11 +39,18 @@ export async function onRequestPost({ request, env }) {
   // verrou de EARN_COOLDOWN_H heures (défaut 18) avant de pouvoir regagner.
   const cap = parseInt(env.SERVER_DAILY_CAP || "200", 10);
   const cooldownMs = Math.round(parseFloat(env.EARN_COOLDOWN_H || "18") * 3600 * 1000);
-  const r = await ledgerCredit(env, { sid: st.sid, pubkey: session.pubkey, amount: sats, cap, cooldownMs });
+  // objectif hebdo : le DO cumule les reps validées par (compte, exercice, semaine)
+  // et verse SATS_WEEKLY_GOAL une seule fois au franchissement de l'objectif
+  const target = weeklyGoal(st.exId);
+  const goal = target > 0 ? {
+    key: `${session.pubkey}:${st.exId}:${isoWeek()}`,
+    add: valid, target, bonus: parseInt(env.SATS_WEEKLY_GOAL || "21", 10),
+  } : null;
+  const r = await ledgerCredit(env, { sid: st.sid, pubkey: session.pubkey, amount: sats, cap, cooldownMs, goal });
   if (!r.ok) {
     if (r.reason === "replay") return json({ error: "Séance déjà validée" }, 409, env);
     return json({ error: "Crédit refusé" }, 400, env);
   }
-  return json({ credited: r.credited, balance: r.balance, valid,
+  return json({ credited: r.credited, balance: r.balance, valid, bonus: r.bonus || 0,
     earned: r.earned, cap: r.cap, lockUntil: r.lockUntil, locked: r.locked }, 200, env);
 }

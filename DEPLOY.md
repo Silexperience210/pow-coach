@@ -11,8 +11,8 @@ Deux méthodes — **B (connexion Git) est recommandée**.
 ## Option A — Direct Upload (rapide, manuel)
 
 1. Cloudflare → **Workers & Pages → Create → Pages → Upload assets**.
-2. Glisse le contenu **à plat** (pas de dossier parent) : `index.html`, `functions/`, `_headers`.
-   (Le ZIP `POW-fixed.zip` fait exactement ça.)
+2. Glisse le contenu **à plat** (pas de dossier parent) : `index.html`, `app.js`, `app.css`,
+   `sw.js`, `manifest.json`, `_headers`, `vendor/`, les icônes et `functions/`.
 3. Configure les **Variables + KV** (voir plus bas) puis **redeploy**.
 
 ➖ Manuel à chaque modif, pas de preview, pas de rollback propre.

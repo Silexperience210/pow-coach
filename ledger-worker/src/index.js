@@ -94,7 +94,7 @@ export class Ledger {
      un verrou de `cooldownMs` bloque tout gain ; à son expiration le compteur
      repart à 0. État : earn:<pubkey> = { earned, lockUntil, ts }. La session
      (sid) reste à usage unique (anti-rejeu). */
-  async credit({ sid, pubkey, amount, cap, cooldownMs }) {
+  async credit({ sid, pubkey, amount, cap, cooldownMs, goal }) {
     const amt = Math.floor(Number(amount));
     if (!pubkey || !Number.isFinite(amt) || amt < 0) return json({ ok: false, reason: "bad" });
     const capN = Math.floor(Number(cap)) || 0;
@@ -102,14 +102,25 @@ export class Ledger {
     return await this.storage.transaction(async (txn) => {
       if (sid && (await txn.get("used:" + sid))) return json({ ok: false, reason: "replay" });
       const now = Date.now();
+      // objectif hebdo : compteur wk:<pubkey>:<exId>:<semaine>. Le bonus part
+      // quand le compteur FRANCHIT l'objectif — monotone, donc payé UNE fois.
+      let bonus = 0;
+      if (goal && goal.key && Number(goal.target) > 0) {
+        const gk = "wk:" + goal.key;
+        const add = Math.max(0, Math.floor(Number(goal.add)) || 0);
+        const prev = (await txn.get(gk)) || 0;
+        const next = prev + add;
+        if (add > 0) await txn.put(gk, next);
+        if (prev < goal.target && next >= goal.target) bonus = Math.max(0, Math.floor(Number(goal.bonus)) || 0);
+      }
       const ek = "earn:" + pubkey;
       let st = (await txn.get(ek)) || { earned: 0, lockUntil: 0 };
       if (st.lockUntil && now >= st.lockUntil) st = { earned: 0, lockUntil: 0 }; // fenêtre expirée → reset
-      let grant = amt, locked = false;
+      let grant = amt + bonus, locked = false;
       if (capN > 0) {
         if (st.lockUntil && now < st.lockUntil) { grant = 0; locked = true; } // verrouillé
         else {
-          grant = Math.max(0, Math.min(amt, capN - st.earned));
+          grant = Math.max(0, Math.min(amt + bonus, capN - st.earned));
           st.earned += grant;
           if (st.earned >= capN) { st.lockUntil = now + cd; locked = true; } // plafond atteint → verrou
         }
@@ -121,7 +132,8 @@ export class Ledger {
       if (grant > 0) await txn.put(balKey, bal);
       if (sid) await txn.put("used:" + sid, now);
       if (!(await this.storage.getAlarm())) await this.storage.setAlarm(now + DAY);
-      return json({ ok: true, credited: grant, balance: bal, earned: st.earned, cap: capN, lockUntil: st.lockUntil || 0, locked });
+      return json({ ok: true, credited: grant, balance: bal, earned: st.earned, cap: capN,
+        lockUntil: st.lockUntil || 0, locked, bonus: grant > 0 ? Math.min(bonus, grant) : 0 });
     });
   }
 
@@ -184,6 +196,14 @@ export class Ledger {
     const earns = await this.storage.list({ prefix: "earn:" });
     for (const [key, st] of earns) {
       if (st && st.ts && now - st.ts > 7 * DAY) await this.storage.delete(key);
+    }
+    // compteurs d'objectif hebdo des semaines révolues (> 3 semaines)
+    const wks = await this.storage.list({ prefix: "wk:" });
+    for (const key of wks.keys()) {
+      const m = key.match(/:(\d{4})-W(\d{1,2})$/);
+      if (!m) continue;
+      const t = Date.UTC(+m[1], 0, 4) + (+m[2] - 1) * 7 * DAY; // ≈ début de semaine ISO
+      if (now - t > 21 * DAY) await this.storage.delete(key);
     }
     await this.storage.setAlarm(now + DAY);
   }
