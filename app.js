@@ -32,6 +32,13 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   faucetDry:"⚡ Faucet momentanément à sec — reviens bientôt 🙏", faucetLow:"⚡ Faucet bientôt vide",
   diffLabel:"Difficulté", diffEasy:"Facile", diffNormal:"Normal", diffHard:"Difficile",
   restBtn:"Minuteur de repos", restTitle:"Repos", restSkip:"Terminer", restDone:"Repos terminé — go ! 💪",
+  guidedL:"Guidée", freeL:"Libre", guidedTag:"Séance",
+  setsFmt:(c,s,r,t)=>`SÉRIE ${c}/${s} · ${r}/${t}`,
+  wsTitle:"🏁 Récap séance", wsPerfectL:"parfaits", wsForm:"forme moy", wsCombo:"combo max", wsDur:"minutes",
+  wsFaults:"À corriger", wsNoFaults:"Aucune faute détectée 💪", wsNext:(n)=>`🎯 Prochain objectif : ${n} par série`,
+  faultL:{valgus:"Genoux qui rentrent",shallow:"Amplitude trop courte",rushed:"Reps trop rapides",partial:"Amplitude incomplète",high:"Poing trop haut",low:"Poing trop bas"},
+  aiTitle:"🧠 Analyse du coach", aiLoading:"Le coach analyse ta séance…", aiLogin:"Connecte-toi (👤) pour l'analyse IA de tes séances",
+  planBtn:"🧠 Plan de la semaine", planTitle:"🧠 Ton plan de la semaine", planLoading:"Le coach prépare ton plan…",
   statClaims:"Derniers retraits", claimsEmpty:"Aucun retrait pour l'instant", claimQr:"QR",
   statTransp:"Transparence du faucet", transpEmpty:"Indisponible", transpToday:(a,b)=>`Distribué aujourd'hui : ${a}${b?(' / '+b):''} sats`,
   zapTip:"Zap cet athlète ⚡",
@@ -51,9 +58,11 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
     jacks:"Bras au ciel, jambes écartées, rythme !", jsq_up:"Explose vers le haut ! 🚀", jsq_down:"Descends et saute",
     punch_full:"Extension complète 🔥", punch_ext:"Allonge davantage le bras", punch_guard:"Garde haute, frappe sec et ramène", punch_high:"Poing trop haut — épaule, coude et poing à l'horizontale", punch_low:"Poing trop bas — remonte à hauteur d'épaule",
     knee_hit:"Genou puissant ! Hanche engagée", knee_up:"Monte le genou au-dessus de la hanche",
-    torso:"Buste et bras visibles face caméra" },
+    torso:"Buste et bras visibles face caméra",
+    valgus:"Pousse les genoux vers l'extérieur !", rushed:"Plus lent — contrôle la descente", partial:"Amplitude complète !" },
   voice:{ start:"C'est parti !", getReady:"Prépare-toi", perfect:"Parfait !", combo:(n)=>`Combo ${n} !`, comboBroken:"Combo perdu", tooHigh:"Trop haut", tooLow:"Trop bas",
-    goal:"Objectif de la semaine atteint ! Félicitations !", milestone:(n,u)=>`${n} ${u==='sec'?'secondes':u==='coups'?'coups':'répétitions'}`, cap:"Plafond du jour atteint" },
+    goal:"Objectif de la semaine atteint ! Félicitations !", milestone:(n,u)=>`${n} ${u==='sec'?'secondes':u==='coups'?'coups':'répétitions'}`, cap:"Plafond du jour atteint",
+    setDone:(n)=>`Série ${n} terminée ! Repos.`, setGo:(n)=>`Série ${n}, c'est parti !`, allDone:"Séance terminée, bravo !" },
   run:{ title:"Course & Marche", start:"Démarrer", stop:"Terminer", ready:"Prêt à partir", paused:"En pause", running:"Course", walking:"Marche",
     durL:"durée", paceL:"allure /km", gpsWait:"📡 Recherche GPS…", gpsReady:"GPS prêt ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Signal GPS faible", gpsDenied:"⚠ Autorise la localisation", noGeo:"GPS non disponible sur cet appareil",
     hrConnect:"Connecter cardio", hrUnsupported:"Bluetooth non supporté (Android Chrome requis)", hrOk:"Cardio connecté ❤️", hrFail:"Cardio non connecté",
@@ -85,6 +94,13 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   faucetDry:"⚡ Faucet temporarily dry — come back soon 🙏", faucetLow:"⚡ Faucet running low",
   diffLabel:"Difficulty", diffEasy:"Easy", diffNormal:"Normal", diffHard:"Hard",
   restBtn:"Rest timer", restTitle:"Rest", restSkip:"Done", restDone:"Rest over — go! 💪",
+  guidedL:"Guided", freeL:"Free", guidedTag:"Session",
+  setsFmt:(c,s,r,t)=>`SET ${c}/${s} · ${r}/${t}`,
+  wsTitle:"🏁 Session recap", wsPerfectL:"perfect", wsForm:"avg form", wsCombo:"max combo", wsDur:"minutes",
+  wsFaults:"To fix", wsNoFaults:"No faults detected 💪", wsNext:(n)=>`🎯 Next target: ${n} per set`,
+  faultL:{valgus:"Knees caving in",shallow:"Range too shallow",rushed:"Rushed reps",partial:"Partial range",high:"Fist too high",low:"Fist too low"},
+  aiTitle:"🧠 Coach analysis", aiLoading:"Coach is reviewing your session…", aiLogin:"Sign in (👤) to get AI analysis of your sessions",
+  planBtn:"🧠 Weekly plan", planTitle:"🧠 Your weekly plan", planLoading:"Coach is building your plan…",
   statClaims:"Recent withdrawals", claimsEmpty:"No withdrawals yet", claimQr:"QR",
   statTransp:"Faucet transparency", transpEmpty:"Unavailable", transpToday:(a,b)=>`Paid out today: ${a}${b?(' / '+b):''} sats`,
   zapTip:"Zap this athlete ⚡",
@@ -104,9 +120,11 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
     jacks:"Arms up, legs wide, keep the rhythm!", jsq_up:"Explode upward! 🚀", jsq_down:"Squat down and jump",
     punch_full:"Full extension 🔥", punch_ext:"Extend the arm further", punch_guard:"Guard up, snap and retract", punch_high:"Fist too high — keep shoulder, elbow and fist level", punch_low:"Fist too low — bring it to shoulder height",
     knee_hit:"Powerful knee! Drive the hip", knee_up:"Raise the knee above your hip",
-    torso:"Torso and arms visible, face the camera" },
+    torso:"Torso and arms visible, face the camera",
+    valgus:"Push your knees outward!", rushed:"Slow down — control the descent", partial:"Full range of motion!" },
   voice:{ start:"Let's go!", getReady:"Get ready", perfect:"Perfect!", combo:(n)=>`Combo ${n}!`, comboBroken:"Combo lost", tooHigh:"Too high", tooLow:"Too low",
-    goal:"Weekly goal reached! Congratulations!", milestone:(n,u)=>`${n} ${u==='sec'?'seconds':u==='hits'?'hits':'reps'}`, cap:"Daily cap reached" },
+    goal:"Weekly goal reached! Congratulations!", milestone:(n,u)=>`${n} ${u==='sec'?'seconds':u==='hits'?'hits':'reps'}`, cap:"Daily cap reached",
+    setDone:(n)=>`Set ${n} done! Rest.`, setGo:(n)=>`Set ${n}, let's go!`, allDone:"Session complete, well done!" },
   run:{ title:"Run & Walk", start:"Start", stop:"Finish", ready:"Ready to go", paused:"Paused", running:"Running", walking:"Walking",
     durL:"time", paceL:"pace /km", gpsWait:"📡 Locating GPS…", gpsReady:"GPS ready ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Weak GPS signal", gpsDenied:"⚠ Allow location", noGeo:"GPS not available on this device",
     hrConnect:"Connect heart rate", hrUnsupported:"Bluetooth not supported (needs Android Chrome)", hrOk:"Heart rate connected ❤️", hrFail:"Heart rate not connected",
@@ -138,6 +156,13 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   faucetDry:"⚡ Faucet temporalmente sin fondos — vuelve pronto 🙏", faucetLow:"⚡ Faucet casi vacío",
   diffLabel:"Dificultad", diffEasy:"Fácil", diffNormal:"Normal", diffHard:"Difícil",
   restBtn:"Temporizador de descanso", restTitle:"Descanso", restSkip:"Terminar", restDone:"¡Descanso terminado — vamos! 💪",
+  guidedL:"Guiada", freeL:"Libre", guidedTag:"Sesión",
+  setsFmt:(c,s,r,t)=>`SERIE ${c}/${s} · ${r}/${t}`,
+  wsTitle:"🏁 Resumen de sesión", wsPerfectL:"perfectas", wsForm:"forma media", wsCombo:"combo máx", wsDur:"minutos",
+  wsFaults:"A corregir", wsNoFaults:"Sin fallos detectados 💪", wsNext:(n)=>`🎯 Próximo objetivo: ${n} por serie`,
+  faultL:{valgus:"Rodillas hacia dentro",shallow:"Rango muy corto",rushed:"Reps apresuradas",partial:"Rango incompleto",high:"Puño muy alto",low:"Puño muy bajo"},
+  aiTitle:"🧠 Análisis del coach", aiLoading:"El coach analiza tu sesión…", aiLogin:"Inicia sesión (👤) para el análisis IA de tus sesiones",
+  planBtn:"🧠 Plan semanal", planTitle:"🧠 Tu plan semanal", planLoading:"El coach prepara tu plan…",
   statClaims:"Retiros recientes", claimsEmpty:"Aún no hay retiros", claimQr:"QR",
   statTransp:"Transparencia del faucet", transpEmpty:"No disponible", transpToday:(a,b)=>`Repartido hoy: ${a}${b?(' / '+b):''} sats`,
   zapTip:"Zap a este atleta ⚡",
@@ -157,9 +182,11 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
     jacks:"¡Brazos arriba, piernas abiertas, ritmo!", jsq_up:"¡Explota hacia arriba! 🚀", jsq_down:"Baja y salta",
     punch_full:"Extensión completa 🔥", punch_ext:"Extiende más el brazo", punch_guard:"Guardia alta, golpea y retrae", punch_high:"Puño muy alto — hombro, codo y puño en horizontal", punch_low:"Puño muy bajo — súbelo a la altura del hombro",
     knee_hit:"¡Rodillazo potente! Empuja la cadera", knee_up:"Sube la rodilla por encima de la cadera",
-    torso:"Torso y brazos visibles frente a la cámara" },
+    torso:"Torso y brazos visibles frente a la cámara",
+    valgus:"¡Empuja las rodillas hacia fuera!", rushed:"Más lento — controla la bajada", partial:"¡Rango completo!" },
   voice:{ start:"¡Vamos!", getReady:"Prepárate", perfect:"¡Perfecto!", combo:(n)=>`¡Combo ${n}!`, comboBroken:"Combo perdido", tooHigh:"Muy alto", tooLow:"Muy bajo",
-    goal:"¡Objetivo semanal logrado! ¡Felicidades!", milestone:(n,u)=>`${n} ${u==='sec'?'segundos':u==='hits'?'golpes':'repeticiones'}`, cap:"Límite diario alcanzado" },
+    goal:"¡Objetivo semanal logrado! ¡Felicidades!", milestone:(n,u)=>`${n} ${u==='sec'?'segundos':u==='hits'?'golpes':'repeticiones'}`, cap:"Límite diario alcanzado",
+    setDone:(n)=>`¡Serie ${n} terminada! Descansa.`, setGo:(n)=>`¡Serie ${n}, vamos!`, allDone:"¡Sesión terminada, bravo!" },
   run:{ title:"Correr & Andar", start:"Empezar", stop:"Terminar", ready:"Listo", paused:"En pausa", running:"Corriendo", walking:"Andando",
     durL:"tiempo", paceL:"ritmo /km", gpsWait:"📡 Buscando GPS…", gpsReady:"GPS listo ✓", gpsOk:"GPS ✓", gpsWeak:"⚠ Señal GPS débil", gpsDenied:"⚠ Permite la ubicación", noGeo:"GPS no disponible en este dispositivo",
     hrConnect:"Conectar pulso", hrUnsupported:"Bluetooth no soportado (requiere Android Chrome)", hrOk:"Pulso conectado ❤️", hrFail:"Pulso no conectado",
@@ -310,7 +337,7 @@ const elbowAngle=P=>avg(ang(P[11],P[13],P[15]),ang(P[12],P[14],P[16]));
 const bodyLine=P=>avg(ang(P[11],P[23],P[27]),ang(P[12],P[24],P[28]));
 const hipAngle=P=>avg(ang(P[11],P[23],P[25]),ang(P[12],P[24],P[26]));
 
-function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
+function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false,minV=Infinity,bottom=null;
   const MIN_MS=350; // anti-rebond : pas 2 reps en moins de 350ms
   return{type:'reps',count:()=>count,analyze(P){
     const vm=+visMinOf(P,o.need).toFixed(2);
@@ -320,11 +347,14 @@ function repEngine(o){let state='up',count=0,fb=0,lastRep=0,reached=false;
     const v=o.value(P),form=o.form(P,v);let msg=o.coach(P,v,state);
     const now=performance.now();
     const dbg={v:Math.round(v),st:state,n:count,vis:vm}; // calibrage
-    if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;}
+    if(state==='up'&&v<o.downAt){state='down';fb=form;reached=false;minV=v;bottom=o.probe?o.probe(P):null;}
     else if(state==='down'){fb=Math.max(fb,form);
       if(v<o.downAt-8)reached=true; // exige une VRAIE descente (marge sous le seuil)
+      if(o.probe&&v<minV){minV=v;bottom=o.probe(P);} // photo de la posture au point bas
       if(v>o.upAt&&reached&&now-lastRep>MIN_MS){state='up';lastRep=now;count++;
-        return{rep:true,repForm:fb,form,msg,dbg:{v:Math.round(v),st:'up',n:count,vis:vm}};}
+        // diagnostic de faute sur la posture au point bas (ex : valgus du genou)
+        const repFault=o.diagnose?o.diagnose(bottom,fb):null;
+        return{rep:true,repForm:fb,form,msg,repFault,dbg:{v:Math.round(v),st:'up',n:count,vis:vm}};}
       if(v>o.upAt)state='up';}
     return{form,msg,dbg};}};}
 /* Pompe vue de FACE : amplitude verticale épaules→poignets, normalisée par la
@@ -362,7 +392,10 @@ function pushupEngine(){
         if(deepest<DEEP && now-lastRep>MIN_MS){ state='up'; lastRep=now; count++;
           const f=Math.round(55+Math.max(0,Math.min(1,(0.5-deepest)/0.4))*45);
           return{rep:true,repForm:f,form:f,msg:'push_up',dbg:{...dbg,st:'up',n:count}}; }
-        state='up'; } } // remonté sans vraie descente → pas de rep
+        const wasPartial=deepest<DOWN; // vraie tentative de descente, mais pas assez profonde
+        state='up';
+        if(wasPartial)return{form:40,msg:'partial',fault:'partial',dbg};
+      } } // remonté sans vraie descente → pas de rep
     return{form:state==='down'?70:40,msg:state==='down'?'push_up':'push_down',dbg};
   }};
 }
@@ -406,6 +439,9 @@ const SPORTS=[
    tip:{fr:'De face ou de profil, corps entier visible',en:'Front or side view, full body visible',es:'De frente o de perfil, cuerpo completo visible'},
    make:()=>repEngine({need:[11,12,23,24,25,26,27,28],value:kneeAngle,downAt:105,upAt:160,
      form:(P,v)=>{const d=gs(v,85,22),b=gs(hipAngle(P),70,45);return Math.round(d*.7+b*.3);},
+     // photo du point bas : écart genoux vs chevilles → détection du valgus (genoux qui rentrent)
+     probe:P=>({kd:Math.abs(P[25].x-P[26].x),ad:Math.abs(P[27].x-P[28].x)}),
+     diagnose:b=>(b&&b.ad>0.06&&b.kd<b.ad*0.75)?'valgus':null, // seulement de face (ad significatif)
      coach:(P,v,st)=>st==='down'?(v<85?'squat_depth':'squat_deeper'):'squat_down'})},
   {id:'pushup',em:'💥',unit:'reps',goal:60,
    name:{fr:'Pompes',en:'Push-ups',es:'Flexiones'},
@@ -465,6 +501,8 @@ const SPORTS=[
    name:{fr:'Squats sautés',en:'Jump squats',es:'Sentadillas con salto'},
    tip:{fr:'De face ou de profil',en:'Front or side view',es:'De frente o de perfil'},
    make:()=>repEngine({need:[23,24,25,26,27,28],value:kneeAngle,downAt:110,upAt:165,
+     probe:P=>({kd:Math.abs(P[25].x-P[26].x),ad:Math.abs(P[27].x-P[28].x)}),
+     diagnose:b=>(b&&b.ad>0.06&&b.kd<b.ad*0.75)?'valgus':null,
      form:(P,v)=>gs(v,90,25),coach:(P,v,st)=>st==='down'?'jsq_up':'jsq_down'})}]},
  {id:'boxe',em:'🥊',theme:'boxe',
   name:{fr:'Boxe anglaise',en:'Boxing',es:'Boxeo'},
@@ -530,7 +568,7 @@ function applyLangStatic(){
 }
 window.openLang=()=>$('modal-lang').classList.add('show');
 window.setLang=l=>{S.lang=l;store.set('powlang',l);closeModal('modal-lang');
-  applyLangStatic();renderHome();say(L().voice.start,{force:true});renderDiff();maybeIntro();};
+  applyLangStatic();renderHome();say(L().voice.start,{force:true});renderDiff();renderGuided();maybeIntro();};
 
 function renderHome(){
   ensureWeek();
@@ -740,6 +778,11 @@ async function startWorkout(exId){
   if(S.serverMode && S.token && earnLockLeft()>0){ toast(L().capLock(fmtDur(earnLockLeft()))); return; }
   S.ex=findEx(exId);S.engine=S.ex.make();S.combo=0;S.comboTier=0;S.sessionSats=0;
   S.phase='align';S.countdown=0;smoothLM=null;S.alignHold=0;S.cdStarted=false;
+  // stats de séance (récap + coach) et mode guidé (séries × reps avec repos auto)
+  S.sessionStart=Date.now();S.sessionReps=0;S.sessionPerfect=0;S.formSum=0;S.maxCombo=0;S.faults={};S.lastRepT=0;
+  S.guided=(store.get('powguided',true)&&SET_BASE[exId]&&S.ex.unit!=='sec')
+    ?{perSet:targetFor(exId),sets:3,cur:1,inSet:0,waiting:false,done:false}:null;
+  setsHUD();
   startServerSession(exId); // ouvre la séance notée serveur (si connecté + serverMode)
   if(S.serverMode && !S.token) toast(L().loginToEarn); // nudge : connexion requise pour gagner
   // respecte le choix de caméra mémorisé (défaut : frontale). Le bouton ⟳ le change.
@@ -831,11 +874,21 @@ function setRing(f){
   r.style.stroke=s>=perfectThreshold()?'var(--grn)':s>=60?'var(--acc)':'var(--hot)';
   $('ring-num').textContent=s;
 }
+/* ---- fautes de forme : comptées pour le récap/coach + cue vocal throttlé ---- */
+let lastFaultVoice=0;
+function addFault(k){
+  if(!k)return;
+  S.faults[k]=(S.faults[k]||0)+1;
+  const now=Date.now(); if(now-lastFaultVoice<2500)return; lastFaultVoice=now;
+  const V=L().voice;
+  const line=k==='high'?V.tooHigh:k==='low'?V.tooLow:(L().coach[k]||'');
+  if(line){ say(line,{force:true}); if(navigator.vibrate)navigator.vibrate(80); }
+  if(L().coach[k])coachMsg(k);
+}
 function handle(r){
   setRing(r.form);if(r.msg)coachMsg(r.msg);
-  // retour vocal de faute (ex. boxe : poing trop haut / trop bas) — 1× par coup
-  if(r.fault){ const V=L().voice; say(r.fault==='high'?V.tooHigh:V.tooLow,{force:true}); if(navigator.vibrate)navigator.vibrate(80); }
-  if(r.rep)onScore(r.repForm);
+  if(r.fault)addFault(r.fault);                          // faute immédiate (boxe haut/bas, pompe partielle)
+  if(r.rep){ if(r.repFault)addFault(r.repFault); onScore(r.repForm); } // faute diagnostiquée au point bas (valgus…)
   if(r.tick)onScore(r.tickForm);
   if(S.cal)calRecord('live',r);
 }
@@ -886,17 +939,22 @@ function earn(sats){
   return grant;
 }
 function onScore(form){
-  const id=S.ex.id,T=L();
+  const id=S.ex.id,T=L(),nowT=Date.now();
   // journal de preuves pour le scoring serveur (le serveur recalcule les sats)
-  if(S.wsToken && S.repLog.length<5000) S.repLog.push({t:Date.now(),form:Math.round(form)});
+  if(S.wsToken && S.repLog.length<5000) S.repLog.push({t:nowT,form:Math.round(form)});
   const before=S.week.progress[id]||0;
   S.week.progress[id]=before+1;
   $('wk-count').textContent=S.week.progress[id];
   const perfect=form>=perfectThreshold();
   let gotSats=0;
+  // stats de séance + tempo : une rep de force expédiée en <1,5 s = pas contrôlée
+  S.sessionReps++;S.formSum+=form;if(perfect)S.sessionPerfect++;
+  if(STRENGTH_RUSH.has(id)&&S.lastRepT&&nowT-S.lastRepT<1500)addFault('rushed');
+  S.lastRepT=nowT;
 
   if(perfect){
     S.combo++;
+    if(S.combo>S.maxCombo)S.maxCombo=S.combo;
     const sats=comboSats(),got=earn(sats);gotSats=got;
     if(got>0){satPop('+'+got+' ⚡',true);flash();}
     // palier de combo franchi ?
@@ -929,6 +987,16 @@ function onScore(form){
   }
   const bc=$('chip-balance');bc.classList.remove('bump');void bc.offsetWidth;bc.classList.add('bump');
   $('balance-val').textContent=S.balance;
+  // séance guidée : fin de série → repos auto ; fin de dernière série → récap
+  if(S.guided&&!S.guided.waiting&&!S.guided.done){
+    const g=S.guided; g.inSet++; setsHUD();
+    if(g.inSet>=g.perSet){
+      if(g.cur<g.sets){ g.waiting=true; say(T.voice.setDone(g.cur),{force:true});
+        if(navigator.vibrate)navigator.vibrate([80,60,80]); openRest(); startRest(60); }
+      else { g.done=true; say(T.voice.allDone,{force:true});
+        setTimeout(()=>{ if(S.running)stopWorkout(); },1600); }
+    }
+  }
 }
 function bumpChallenges(exId){
   let changed=false;
@@ -956,7 +1024,111 @@ function showCombo(n){
 window.stopWorkout=()=>{S.running=false;S.phase='align';S.cdStarted=false;speechSynthesis.cancel();
   $('align-meter').classList.remove('show');$('statuspill').classList.remove('show','big');
   const v=$('video');if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());
-  v.srcObject=null;submitServerSession();goHome();};
+  v.srcObject=null;
+  const sum=finishSummary();                       // récap + ajustement de la cible
+  submitServerSession();goHome();
+  if(sum)showWorkoutSummary(sum);};
+
+/* =========================================================
+   COACH — progression adaptative, séances guidées, récap, IA
+   ========================================================= */
+// taille de série de départ par exercice (reps/hits) — les tenues (sec) restent libres
+const SET_BASE={squat:12,pushup:10,lunge:10,bridge:12,jsquat:8,knee:20,jab:30,punch2:30,jacks:30};
+// exercices de force où une rep < 1,5 s est forcément expédiée
+const STRENGTH_RUSH=new Set(['squat','jsquat','lunge','pushup','bridge']);
+function targetFor(exId){ const t=store.get('powtargets',{});
+  return Math.max(5,Math.min(100,parseInt(t[exId],10)||SET_BASE[exId]||12)); }
+/* surcharge progressive : ≥70 % de parfaits et volume atteint → +10 % ;
+   <40 % de parfaits → -10 % (la qualité prime sur le volume) */
+function adjustTarget(sum){
+  if(!SET_BASE[sum.ex]||sum.reps<5)return;
+  const pct=Math.round(sum.perfect/sum.reps*100);
+  const t=store.get('powtargets',{}),cur=targetFor(sum.ex);let next=cur;
+  if(pct>=70&&sum.reps>=cur)next=Math.min(100,Math.ceil(cur*1.1));
+  else if(pct<40)next=Math.max(5,Math.floor(cur*0.9));
+  if(next!==cur){t[sum.ex]=next;store.set('powtargets',t);}
+}
+function setsHUD(){ const el=$('wk-sets'); if(!el)return;
+  const g=S.guided; el.textContent=g?L().setsFmt(g.cur,g.sets,g.inSet,g.perSet):''; }
+function guidedResume(){ const g=S.guided; if(!g||!g.waiting)return;
+  g.waiting=false; g.cur++; g.inSet=0; setsHUD(); say(L().voice.setGo(g.cur),{force:true}); }
+window.setGuided=(v)=>{ store.set('powguided',!!v); renderGuided(); };
+function renderGuided(){ const seg=$('guided-seg'); if(!seg)return;
+  const T=L(),on=store.get('powguided',true);
+  const gl=$('guided-label'); if(gl)gl.textContent=T.guidedTag;
+  const pb=$('plan-btn'); if(pb)pb.textContent=T.planBtn;
+  seg.innerHTML=`<button class="${on?'on':''}" onclick="setGuided(true)">${T.guidedL}</button>`+
+    `<button class="${on?'':'on'}" onclick="setGuided(false)">${T.freeL}</button>`; }
+function finishSummary(){
+  if(!S.ex||S.sessionReps<1)return null;
+  const sum={ t:Date.now(), ex:S.ex.id, reps:S.sessionReps, perfect:S.sessionPerfect,
+    avgForm:Math.round(S.formSum/Math.max(1,S.sessionReps)),
+    durMin:Math.max(1,Math.round((Date.now()-S.sessionStart)/60000)),
+    maxCombo:S.maxCombo, target:S.guided?S.guided.perSet:0, sats:S.sessionSats, faults:{...S.faults} };
+  const l=store.get('powsessions',[]); l.unshift(sum); store.set('powsessions',l.slice(0,50));
+  adjustTarget(sum);
+  return sum;
+}
+function showWorkoutSummary(sum){
+  const T=L(),ex=findEx(sum.ex);
+  $('ws-title').textContent=T.wsTitle;
+  $('ws-ex').textContent=ex?ex.em+' '+ex.name[S.lang]:sum.ex;
+  $('ws-reps').textContent=sum.reps; $('ws-reps-l').textContent=T[(ex&&ex.unit)||'reps'];
+  const pct=sum.reps?Math.round(sum.perfect/sum.reps*100):0;
+  $('ws-perfect').textContent=pct+'%'; $('ws-perfect-l').textContent=T.wsPerfectL;
+  $('ws-form').textContent=sum.avgForm; $('ws-form-l').textContent=T.wsForm;
+  $('ws-combo').textContent='×'+sum.maxCombo; $('ws-combo-l').textContent=T.wsCombo;
+  $('ws-dur').textContent=sum.durMin; $('ws-dur-l').textContent=T.wsDur;
+  $('ws-sats').textContent='⚡'+sum.sats;
+  const fw=$('ws-faults'),top=Object.entries(sum.faults||{}).sort((a,b)=>b[1]-a[1]).slice(0,2);
+  fw.innerHTML= top.length
+    ? `<div class="ws-faults-t">${T.wsFaults}</div>`+top.map(([k,n])=>
+        `<div class="ws-fault"><span>${T.faultL[k]||k} <b>×${n}</b></span><small>${T.coach[k]||''}</small></div>`).join('')
+    : `<p class="hint" style="text-align:center;margin:8px 0">${T.wsNoFaults}</p>`;
+  $('ws-next').textContent=SET_BASE[sum.ex]?T.wsNext(targetFor(sum.ex)):'';
+  const ai=$('ws-ai');
+  if(S.coachOn){ ai.style.display='block'; $('ws-ai-t').textContent=T.aiTitle;
+    $('ws-ai-text').textContent=S.token?T.aiLoading:T.aiLogin;
+    if(S.token)fetchDebrief(sum);
+  } else ai.style.display='none';
+  $('ws-close').textContent=T.close;
+  $('modal-wksummary').classList.add('show');
+}
+async function fetchDebrief(sum){
+  try{
+    const hist=store.get('powsessions',[]).slice(1,6)
+      .map(s=>({...s,daysAgo:Math.max(0,Math.round((Date.now()-s.t)/864e5))}));
+    const r=await fetch(API()+'/coach/advise',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:S.token,type:'debrief',lang:S.lang,data:{last:{...sum,daysAgo:0},history:hist}})});
+    const d=await r.json();
+    $('ws-ai-text').textContent=d.text||d.error||'—';
+  }catch(e){ $('ws-ai-text').textContent='—'; }
+}
+window.openPlan=async()=>{
+  const T=L();
+  if(!S.token){ toast(T.aiLogin); openAccount(); return; }
+  $('plan-title').textContent=T.planTitle; $('plan-close').textContent=T.close;
+  const box=$('plan-text'),cached=store.get('powplan',null);
+  $('modal-plan').classList.add('show');
+  if(cached&&cached.week===weekId()&&cached.lang===S.lang){ box.textContent=cached.text; return; }
+  box.textContent=T.planLoading;
+  try{
+    ensureWeek();
+    const progress=SPORTS.flatMap(s=>s.ex).map(e=>({ex:e.id,done:S.week.progress[e.id]||0,goal:e.goal}));
+    progress.push({ex:'run',done:Math.round((S.week.runKm||0)*10),goal:200}); // ticks de 100 m
+    const r=await fetch(API()+'/coach/advise',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:S.token,type:'plan',lang:S.lang,data:{progress,streak:ensureStats().streak}})});
+    const d=await r.json();
+    if(d.text){ box.textContent=d.text; store.set('powplan',{week:weekId(),lang:S.lang,text:d.text}); }
+    else box.textContent=d.error||'—';
+  }catch(e){ box.textContent='—'; }
+};
+// le coach IA est-il configuré côté serveur ? (KIMI_API_KEY) → affiche le bouton plan
+async function checkCoach(){
+  try{ const d=await (await fetch(API()+'/coach/advise')).json(); S.coachOn=!!d.enabled; }
+  catch(e){ S.coachOn=false; }
+  const b=$('plan-btn'); if(b)b.style.display=S.coachOn?'block':'none';
+}
 
 /* =========================================================
    COURSE & MARCHE — GPS + carte OpenStreetMap (Leaflet, open-source)
@@ -1570,8 +1742,10 @@ window.startRest=(s)=>{ clearInterval(restTimer); restLeft=s; $('rest-count').te
   if(navigator.vibrate)navigator.vibrate(20);
   restTimer=setInterval(()=>{ restLeft--; $('rest-count').textContent=restLeft>0?restLeft:'✓';
     if(restLeft<=0){ clearInterval(restTimer); if(navigator.vibrate)navigator.vibrate([80,60,80,60,180]);
-      say(L().restDone,{force:true}); toast(L().restDone); setTimeout(()=>closeModal('modal-rest'),1200); } },1000); };
-window.stopRest=()=>{ clearInterval(restTimer); closeModal('modal-rest'); };
+      const guidedNext=S.guided&&S.guided.waiting; // séance guidée : la voix annonce la série, pas le repos
+      if(!guidedNext){ say(L().restDone,{force:true}); toast(L().restDone); }
+      setTimeout(()=>{ closeModal('modal-rest'); if(guidedNext)guidedResume(); },guidedNext?600:1200); } },1000); };
+window.stopRest=()=>{ clearInterval(restTimer); closeModal('modal-rest'); guidedResume(); };
 
 /* ---------- F. transparence du faucet (alimenté par /faucet) ---------- */
 function renderTransparency(d){ const card=$('transp-card'); if(!card)return; const T=L();
@@ -1962,6 +2136,6 @@ function importChallengeFromHash(){
 }
 
 /* ---------- init ---------- */
-ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();renderDiff();
+ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();renderDiff();renderGuided();checkCoach();
 if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');} // 1re visite : langue d'abord, l'intro suivra (setLang)
 else maybeIntro();
