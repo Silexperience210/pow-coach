@@ -30,6 +30,19 @@
 - **Tests unitaires** (`npm test`, `node --test`, zéro dépendance) sur `_shared.js` :
   secp256k1/LNURL-auth, bech32, bolt11, `validateRepLog`. **CI sur toutes les branches.**
 
+### Publication Nostr fiabilisée (diagnostic « je n'arrive pas à publier mon parcours »)
+- **noble (secp256k1/Schnorr) auto-hébergé** dans `vendor/noble-secp256k1.js` (bundle
+  `@noble/curves@1.8.1`, vérifié croisé contre npm) : la signature ne charge plus rien
+  depuis jsdelivr au moment de publier — les réseaux/navigateurs qui bloquent le CDN
+  (DNS filtrant, Brave…) cassaient la publication alors que le partage local marchait.
+  Précaché par le SW → signature possible hors-ligne.
+- **`publishTo` durci** : un `["OK", id, false, raison]` (NIP-20) n'est plus compté comme
+  succès ; timeout 4 s → 8 s (handshakes mobiles) ; en cas d'échec total, le toast affiche
+  la **raison renvoyée par le relay** au lieu d'un message générique.
+- **`nostr.bitcoiner.social` retiré des relays par défaut** (timeout systématique aux EVENT,
+  constaté au test) → remplacé par `offchain.pub` (accepte kind 30078, testé avec un tracé
+  complet de 300 points).
+
 ---
 
 Correctifs appliqués sur cette version (par rapport au bundle d'origine).

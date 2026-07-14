@@ -234,7 +234,9 @@ async function submitServerSession(){
     if(d.locked&&earnLockLeft()>0)toast(L().capLock(fmtDur(earnLockLeft()))); // plafond atteint → cooldown
   }catch(e){}
 }
-const DEFAULT_RELAYS=['wss://relay.damus.io','wss://nos.lol','wss://relay.primal.net','wss://nostr.bitcoiner.social'];
+// relays testés à l'écriture (kind 30078). bitcoiner.social retiré : ne répond
+// plus aux EVENT (timeout systématique constaté), remplacé par offchain.pub.
+const DEFAULT_RELAYS=['wss://relay.damus.io','wss://nos.lol','wss://relay.primal.net','wss://offchain.pub'];
 // relais perso optionnel (ex: relais 21pay) ajouté à la liste de publication/lecture
 function RELAYS(){ const x=(store.get('powrelay','')||'').trim();
   return x&&/^wss:\/\//.test(x)?DEFAULT_RELAYS.concat(x):DEFAULT_RELAYS; }
@@ -1387,8 +1389,9 @@ window.publishRun=async()=>{
       zap:(store.get('powlnaddr','')||undefined) });
     const ev=await signEvent({ kind:30078, created_at:Math.floor(Date.now()/1000),
       tags:[['d','powcoach-run'],['n',S.nick],['km',String(run.km)],['t','powcoachrun']], content });
-    let ok=0; await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
-    toast(ok?Tb.published(ok):Tb.pubFail); if(ok)loadRunBoard();
+    let ok=0;const errs=[];
+    await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(e=>errs.push(e&&e.message||''))));
+    toast(ok?Tb.published(ok):pubFailMsg(Tb,errs)); if(ok)loadRunBoard();
   }catch(e){ toast(Tb.err+(e.message||'')); }
   btn.disabled=false; btn.textContent='📡 '+T.publishRun;
 };
@@ -1717,13 +1720,15 @@ async function nostrKey(){
     sk=[...a].map(b=>b.toString(16).padStart(2,'0')).join('');store.set('pownostrsk',sk); }
   return sk;
 }
-// secp256k1 schnorr : on utilise la lib noble via CDN dynamique (chargée à la 1re pub)
+// secp256k1 schnorr : lib noble AUTO-HÉBERGÉE (vendor/, comme Leaflet/qrcode).
+// Plus de dépendance CDN au moment de publier : certains réseaux/navigateurs
+// (DNS filtrant, Brave…) bloquent jsdelivr, ce qui cassait la publication Nostr
+// alors que le reste de l'app marchait. Précaché par le SW → signe même hors-ligne.
 let nobleReady=null;
 async function loadNoble(){
   if(nobleReady)return nobleReady;
   nobleReady=(async()=>{
-    // @noble/curves : schnorr stable (getPublicKey/sign/verify). CSP autorise jsdelivr.
-    const m=await import('https://cdn.jsdelivr.net/npm/@noble/curves@1.8.1/secp256k1/+esm');
+    const m=await import('/vendor/noble-secp256k1.js'); // @noble/curves@1.8.1 (bundle local)
     const schnorr=m.schnorr||(m.default&&m.default.schnorr);
     const bytesToHex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
     return {schnorr,bytesToHex};
@@ -1753,19 +1758,26 @@ window.publishScore=async()=>{
     const ev=await signEvent({ kind:30078, created_at:Math.floor(Date.now()/1000),
       tags:[['d','powcoach-score'],['n',S.nick],['reps',String(st.totalReps)],['streak',String(st.streak)],['t','powcoach']],
       content:JSON.stringify({reps:st.totalReps,streak:st.streak,perfect:st.totalPerfect,nick:S.nick,zap:(store.get('powlnaddr','')||undefined)}) }); // zap: adresse LN opt-in (si renseignée)
-    let ok=0;
-    await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(()=>{})));
-    toast(ok?T.published(ok):T.pubFail);
+    let ok=0;const errs=[];
+    await Promise.all(RELAYS().map(r=>publishTo(r,ev).then(()=>ok++).catch(e=>errs.push(e&&e.message||''))));
+    toast(ok?T.published(ok):pubFailMsg(T,errs));
     loadBoard(true);
   }catch(e){toast(T.err+(e.message||''));}
   btn.disabled=false;btn.textContent=T.publish;
 };
+// message d'échec de publication : générique + 1re raison concrète remontée par un relay
+function pubFailMsg(T,errs){ const r=(errs||[]).find(e=>e&&e!=='timeout'&&e!=='conn')||errs[0]||'';
+  return T.pubFail+(r?' — '+String(r).slice(0,80):''); }
 function publishTo(url,ev){ return new Promise((res,rej)=>{
-  const ws=new WebSocket(url);const to=setTimeout(()=>{ws.close();rej();},4000);
+  let ws; try{ ws=new WebSocket(url); }catch(e){ return rej(new Error('conn')); }
+  // 8 s : les handshakes TLS+WS mobiles dépassent facilement les 4 s d'avant
+  const to=setTimeout(()=>{try{ws.close();}catch(e){} rej(new Error('timeout'));},8000);
   ws.onopen=()=>ws.send(JSON.stringify(["EVENT",ev]));
   ws.onmessage=(m)=>{ try{const d=JSON.parse(m.data);
-    if(d[0]==='OK'){clearTimeout(to);ws.close();res();}}catch(e){} };
-  ws.onerror=()=>{clearTimeout(to);rej();};
+    if(d[0]==='OK'&&d[1]===ev.id){ clearTimeout(to);try{ws.close();}catch(e){}
+      // NIP-20 : ["OK", id, true/false, raison] — un refus n'est PAS un succès
+      d[2]===true?res():rej(new Error(String(d[3]||'refusé'))); }}catch(e){} };
+  ws.onerror=()=>{clearTimeout(to);rej(new Error('conn'));};
 }); }
 window.loadBoard=async(force)=>{
   const T=L(),list=$('board-list');

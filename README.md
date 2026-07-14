@@ -50,7 +50,7 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 
 - Une clé Nostr est générée localement au premier partage de score (stockée sur l'appareil).
 - Les scores sont **publics et auto-déclarés** : le classement reflète ce que chacun publie (les signatures sont vérifiées, donc personne ne peut publier *au nom d'un autre*, mais chacun choisit son chiffre). Pour un classement à enjeux, une validation serveur des reps serait nécessaire (évolution future).
-- Relays par défaut : Damus, nos.lol, Primal, bitcoiner.social (modifiables dans `DEFAULT_RELAYS`).
+- Relays par défaut : Damus, nos.lol, Primal, offchain.pub (modifiables dans `DEFAULT_RELAYS` ; testés à l'écriture — bitcoiner.social retiré car il ne répond plus aux EVENT).
 
 
 ## 🚀 Déploiement (Cloudflare Pages)
@@ -123,7 +123,7 @@ Puis **redeploy** (Deployments → Retry) pour appliquer variables et binding.
 | Triche sur la course GPS | ⚠ Client rejette >30 km/h instantané + dérive à l'arrêt ; serveur exige **≥20 s/100 m** (>18 km/h soutenu rejeté = véhicule). L'**import GPX ne rapporte aucun sat** (fichier non vérifiable). |
 | Spam des séances (`/session/*`) | ✔ Rate-limit best-effort par IP (KV) sur `start` et `submit` |
 | Faucet à sec / paiements ratés | ✔ Pré-check du solde du wallet avant de promettre un retrait + bannière `dry`/`low` |
-| Dépendance CDN compromise | ✔ qrcodejs **et Leaflet auto-hébergés** (`vendor/`), CSP resserrée ; MediaPipe + noble restent des imports ES **épinglés** (SRI non applicable aux imports de modules). Seules les *tuiles* carto viennent de `tile.openstreetmap.org` (img-src) |
+| Dépendance CDN compromise | ✔ qrcodejs, Leaflet **et noble (secp256k1/Schnorr) auto-hébergés** (`vendor/`), CSP resserrée ; seul MediaPipe reste un import ES **épinglé** (SRI non applicable aux imports de modules). La signature Nostr ne dépend donc plus d'aucun CDN. Seules les *tuiles* carto viennent de `tile.openstreetmap.org` (img-src) |
 
 > **Plafonnement strict (optionnel).** Par défaut les compteurs vivent en **KV**
 > (best-effort : sous très fort parallélisme ils peuvent légèrement se chevaucher).

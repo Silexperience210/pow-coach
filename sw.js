@@ -4,9 +4,10 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v6';
+const CACHE = 'powcoach-v7';
 const SHELL = ['/', '/index.html', '/app.js', '/app.css', '/manifest.json', '/vendor/qrcode.min.js',
-  '/vendor/leaflet.js', '/vendor/leaflet.css', '/icon-192.png', '/icon-512.png'];
+  '/vendor/leaflet.js', '/vendor/leaflet.css', '/vendor/noble-secp256k1.js',
+  '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   // cache:'reload' → on rapatrie le shell frais (contourne le cache HTTP/CDN) à chaque version
