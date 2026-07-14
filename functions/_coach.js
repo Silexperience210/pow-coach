@@ -93,15 +93,30 @@ export function buildMessages(type, lang, data) {
   ];
 }
 
-/* Appelle un endpoint chat/completions compatible OpenAI (Kimi/Moonshot). */
+/* Paramètres d'appel selon le mode (validés en réel contre kimi-k2.6) :
+   - thinking DÉSACTIVÉ (défaut) : temperature 0.6 exigée, ~10 s, ~130 tokens/débrief.
+   - KIMI_THINKING=1 : mode raisonnement → temperature 1 exigée, il faut un gros
+     budget de tokens (le raisonnement en consomme ~1000) et un timeout large. */
+export function llmParams(env, maxTokens) {
+  const thinking = env.KIMI_THINKING === "1";
+  return thinking
+    ? { temperature: 1, max_tokens: Math.max(2048, (maxTokens || 260) + 1800), timeoutMs: 110000 }
+    : { temperature: 0.6, max_tokens: maxTokens || 260, thinking: { type: "disabled" }, timeoutMs: 25000 };
+}
+
+/* Appelle un endpoint chat/completions compatible OpenAI (Kimi/Moonshot).
+   fetchFn(url, opts, timeoutMs) permet d'injecter tfetch (et les tests). */
 export async function llmChat(env, messages, maxTokens, fetchFn) {
   const base = (env.KIMI_URL || "https://api.moonshot.ai/v1").replace(/\/+$/, "");
-  const model = env.KIMI_MODEL || "kimi-k2-turbo-preview";
+  const model = env.KIMI_MODEL || "kimi-k2.6";
+  const p = llmParams(env, maxTokens);
+  const body = { model, messages, temperature: p.temperature, max_tokens: p.max_tokens };
+  if (p.thinking) body.thinking = p.thinking;
   const r = await (fetchFn || fetch)(base + "/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + env.KIMI_API_KEY },
-    body: JSON.stringify({ model, messages, temperature: 0.6, max_tokens: maxTokens || 260 }),
-  });
+    body: JSON.stringify(body),
+  }, p.timeoutMs);
   if (!r.ok) throw new Error("llm_" + r.status);
   const d = await r.json();
   const text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;

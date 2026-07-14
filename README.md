@@ -81,8 +81,9 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 | `UNIFORM_MIN_REPS` | Plaintext | `20` (anti-métronome : nb mini de reps pour évaluer la régularité) |
 | `UNIFORM_CV` | Plaintext | `0.05` (anti-métronome : coefficient de variation sous lequel une série est jugée scriptée → 0 sat) |
 | `KIMI_API_KEY` | **Encrypt** 🔒 | clé API Moonshot/Kimi — active le **coach IA** (débrief + plan hebdo) |
-| `KIMI_MODEL` | Plaintext | id du modèle Kimi de ton dashboard (ex : la version 2.6 que tu utilises) ; défaut `kimi-k2-turbo-preview` |
+| `KIMI_MODEL` | Plaintext | défaut **`kimi-k2.6`** (id exact vérifié via `GET /v1/models`) |
 | `KIMI_URL` | Plaintext | défaut `https://api.moonshot.ai/v1` (tout endpoint compatible OpenAI fonctionne) |
+| `KIMI_THINKING` | Plaintext | `0` (défaut : raisonnement **désactivé** → ~10 s, ~130 tokens/débrief). `1` = mode raisonnement (~80 s, ~1200 tokens — plus cher/lent, qualité marginalement meilleure) |
 | `COACH_DAILY_CAP` | Plaintext | `15` (appels coach IA / jour / compte — borne le coût API) |
 
 ### KV (obligatoire pour l'auth + les budgets)
