@@ -80,6 +80,8 @@ window.POW_CONFIG = Object.freeze({
     <button class="tip-link" id="tip-link" onclick="openTip()">💛 Support the project — send a tip ⚡</button>
     <button class="tip-link" id="install-btn" onclick="installApp()">📲 Install PoW Coach — add to home screen</button>
     <div class="diff-row"><span class="diff-label" id="diff-label"></span><div class="seg" id="diff-seg"></div></div>
+    <div class="diff-row"><span class="diff-label" id="guided-label"></span><div class="seg" id="guided-seg"></div></div>
+    <button class="tip-link" id="plan-btn" onclick="openPlan()" style="display:none"></button>
     <button class="tip-link" id="rest-btn" onclick="openRest()">⏱ <span id="rest-btn-l"></span></button>
     <div class="section-title" id="st-sports"></div>
     <div class="grid" id="sports-grid"></div>
@@ -168,6 +170,7 @@ window.POW_CONFIG = Object.freeze({
     </div>
     <div class="hud-bottom">
       <div class="counter"><span class="num" id="wk-count">0</span><span class="lbl" id="wk-unit"></span></div>
+      <div class="session-sets" id="wk-sets"></div>
       <div class="session-sats" id="session-sats"></div>
       <div class="coachmsg" id="coachmsg"></div>
       <div class="wk-actions">
@@ -365,6 +368,42 @@ window.POW_CONFIG = Object.freeze({
     <div id="rest-count" style="font-family:'Chakra Petch',monospace;font-size:64px;color:var(--acc);margin:8px 0">--</div>
     <div class="seg" id="rest-presets" style="justify-content:center;width:max-content;margin:0 auto 12px"></div>
     <div class="wk-actions"><button class="btn-ghost" onclick="stopRest()" id="rest-skip" style="width:100%"></button></div>
+  </div>
+</div>
+
+<!-- ============ RÉCAP SÉANCE (coach) ============ -->
+<div class="modal" id="modal-wksummary">
+  <div class="sheet">
+    <h2 id="ws-title"></h2>
+    <p class="reward-sub" id="ws-ex" style="margin-bottom:10px"></p>
+    <div class="rs-km-hero"><b id="ws-reps">0</b><span id="ws-reps-l"></span></div>
+    <div class="rs-grid">
+      <div class="rs-cell"><b id="ws-perfect">—</b><span id="ws-perfect-l"></span></div>
+      <div class="rs-cell"><b id="ws-form">—</b><span id="ws-form-l"></span></div>
+      <div class="rs-cell"><b id="ws-combo">—</b><span id="ws-combo-l"></span></div>
+      <div class="rs-cell"><b id="ws-dur">—</b><span id="ws-dur-l"></span></div>
+      <div class="rs-cell" style="grid-column:span 2"><b id="ws-sats">⚡0</b><span>sats</span></div>
+    </div>
+    <div id="ws-faults"></div>
+    <p class="ws-next" id="ws-next"></p>
+    <div class="ai-box" id="ws-ai" style="display:none">
+      <div class="ws-faults-t" id="ws-ai-t"></div>
+      <p id="ws-ai-text"></p>
+    </div>
+    <div class="wk-actions">
+      <button class="btn-acc" onclick="closeModal('modal-wksummary')" id="ws-close" style="width:100%"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLAN DE LA SEMAINE (coach IA) ============ -->
+<div class="modal" id="modal-plan">
+  <div class="sheet">
+    <h2 id="plan-title"></h2>
+    <div class="ai-box"><p id="plan-text" style="white-space:pre-wrap"></p></div>
+    <div class="wk-actions">
+      <button class="btn-ghost" onclick="closeModal('modal-plan')" id="plan-close" style="width:100%"></button>
+    </div>
   </div>
 </div>
 
