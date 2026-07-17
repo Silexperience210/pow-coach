@@ -4,7 +4,7 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v7';
+const CACHE = 'powcoach-v8'; // v8 : purge l'ancien cache qui contenait /coach/advise (bug d'exclusion)
 const SHELL = ['/', '/index.html', '/app.js', '/app.css', '/manifest.json', '/vendor/qrcode.min.js',
   '/vendor/leaflet.js', '/vendor/leaflet.css', '/vendor/noble-secp256k1.js',
   '/icon-192.png', '/icon-512.png'];
@@ -27,7 +27,9 @@ self.addEventListener('fetch', (e) => {
   const sameOrigin = url.origin === location.origin;
 
   // API dynamique : ne jamais servir depuis le cache
-  if (sameOrigin && /^\/(claim|session|balance|auth|faucet)(\/|$)/.test(url.pathname)) return;
+  // (coach ajouté : GET /coach/advise était caché cache-first → {enabled:false}
+  // restait collé pour toujours même après activation de KIMI_API_KEY côté serveur)
+  if (sameOrigin && /^\/(claim|session|balance|auth|faucet|coach)(\/|$)/.test(url.pathname)) return;
   // gros modèle MediaPipe : réseau direct, pas de cache
   if (/\.task(\?|$)/.test(url.pathname)) return;
   // tuiles carto (CARTO dark / OSM) : réseau direct (évite de saturer le cache pendant une course)

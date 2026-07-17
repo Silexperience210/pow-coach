@@ -12,7 +12,8 @@ export async function onRequestGet({ request, env }) {
 
   const raw = await env.FAUCET_KV.get("auth:" + k1);
   if (!raw) return json({ status: "expired" }, 200, env);
-  const st = JSON.parse(raw);
+  let st;
+  try { st = JSON.parse(raw); } catch { return json({ status: "expired" }, 200, env); }
   if (st.status === "ok") return json({ status: "ok", token: st.token, pubkey: st.pubkey }, 200, env);
   return json({ status: "pending" }, 200, env);
 }

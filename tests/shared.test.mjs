@@ -120,7 +120,7 @@ test("hex roundtrip", () => {
 });
 
 /* ---------- scoring serveur : validateRepLog ---------- */
-const env = {}; // défauts : seuil 92, base 1, paliers 5:2/10:3/21:5
+const env = {}; // défauts : seuil 92, base 1, paliers 10:2/21:3 (alignés client)
 const t0 = Date.now() - 10 * 60 * 1000, now = Date.now();
 
 test("reps parfaites espacées → payées, trop rapprochées → ignorées", () => {
@@ -133,9 +133,22 @@ test("reps hors fenêtre de séance → ignorées", () => {
   assert.equal(r.valid, 1);
 });
 test("combos : les paliers augmentent le tarif", () => {
-  // 10 reps parfaites espacées d'1 s → 4×1 + 5×2 (dès la 5e) + 1×3 (la 10e) = 17
+  // 10 reps parfaites espacées d'1 s → 9×1 + 1×2 (la 10e, palier ×10) = 11
   const reps = Array.from({ length: 10 }, (_, i) => ({ t: t0 + i * 1000, form: 95 }));
-  assert.equal(validateRepLog(env, "squat", t0, now, reps).sats, 17);
+  assert.equal(validateRepLog(env, "squat", t0, now, reps).sats, 11);
+});
+test("combos : le palier ×21 paie 3 sats (défaut aligné client)", () => {
+  // 21 reps à rythme humain (base 1,1 s + jitter ≥ plancher squat 0,8 s — sinon
+  // rejet "rep trop rapide" ; et jitter sinon l'anti-métronome annule) →
+  // 9×1 + 11×2 (×10→2 dès la 10e) + 1×3 (×21) = 34
+  const reps = Array.from({ length: 21 }, (_, i) => ({ t: t0 + i * 1100 + ((i * 137) % 400) - 200, form: 95 }));
+  assert.equal(validateRepLog(env, "squat", t0, now, reps).sats, 34);
+});
+test("difficulté signée : easy abaisse le seuil, hard le relève", () => {
+  const reps = [{ t: t0, form: 85 }, { t: t0 + 1200, form: 96 }];
+  assert.equal(validateRepLog(env, "squat", t0, now, reps).sats, 1);        // défaut 92 : seule 96 paie
+  assert.equal(validateRepLog(env, "squat", t0, now, reps, "easy").sats, 2); // seuil 82 : les deux paient
+  assert.equal(validateRepLog(env, "squat", t0, now, reps, "hard").sats, 0); // seuil 97 : aucune ne paie
 });
 test("course : la marche paie le tarif de base, la course les combos", () => {
   // 3 ticks course (form 100) + 2 ticks marche (form 80), espacés de 25 s

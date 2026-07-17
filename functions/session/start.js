@@ -3,15 +3,9 @@
    (HMAC) que le client renverra à /session/submit avec le journal de reps.
    Nécessite : connexion (token), binding LEDGER (DO) et SESSION_SECRET.
    Le scoring serveur est désactivé (501) si l'un manque → l'app reste en legacy. */
-import { json, preflight, originOk, randHex, signSession, rateLimitKV, clientIp } from "../_shared.js";
+import { json, preflight, originOk, getSession, randHex, signSession, rateLimitKV, clientIp } from "../_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
-
-async function getSession(env, token) {
-  if (!token || !env.FAUCET_KV) return null;
-  const raw = await env.FAUCET_KV.get("session:" + token);
-  return raw ? JSON.parse(raw) : null;
-}
 
 export async function onRequestPost({ request, env }) {
   if (!originOk(request, env)) return json({ error: "Origine refusée" }, 403, env);
@@ -26,9 +20,12 @@ export async function onRequestPost({ request, env }) {
 
   const exId = String(body.exId || "");
   if (!/^[a-z0-9_]{1,32}$/i.test(exId)) return json({ error: "exId invalide" }, 400, env);
+  // difficulté choisie côté client (Facile/Normal/Difficile) : signée dans le jeton
+  // pour que le scoring serveur applique le MÊME seuil "parfait" que l'affichage.
+  const diff = /^(easy|normal|hard)$/.test(body.diff) ? body.diff : "normal";
 
   const startTs = Date.now();
   const sid = randHex(16);
-  const sessionId = await signSession(env.SESSION_SECRET, { sid, pubkey: session.pubkey, exId, startTs });
+  const sessionId = await signSession(env.SESSION_SECRET, { sid, pubkey: session.pubkey, exId, diff, startTs });
   return json({ sessionId, startTs }, 200, env);
 }

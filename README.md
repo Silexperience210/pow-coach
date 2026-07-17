@@ -72,6 +72,7 @@ Tout tourne sur **Cloudflare Pages + Functions**. L'admin key LNbits vit en **Se
 | `USER_DAILY_CAP` | Plaintext | `200` (cap/jour par compte connecté) |
 | `ANON_DAILY_CAP` | Plaintext | `100` (cap/jour **par IP** quand non connecté ; défaut = `MAX_CLAIM_SATS`) |
 | `REQUIRE_AUTH` | Plaintext | `0` (ou `1` pour exiger la connexion) |
+| `COMBO_TIERS` | Plaintext | défaut `10:2,21:3` — paliers de combo du scoring serveur, **alignés sur `POW_CONFIG`** ; format `palier:sats,palier:sats` |
 | `SESSION_SECRET` | **Encrypt** 🔒 | secret HMAC des jetons de séance — active le **scoring serveur** (avec `LEDGER`) |
 | `SERVER_DAILY_CAP` | Plaintext | `200` (sats gagnables par fenêtre/compte avant cooldown, scoring serveur) |
 | `EARN_COOLDOWN_H` | Plaintext | `18` (heures de blocage des gains une fois `SERVER_DAILY_CAP` atteint ; puis remise à zéro) |
