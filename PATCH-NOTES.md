@@ -1,5 +1,37 @@
 # 🔧 PoW Coach — correctifs sécurité & bugs
 
+## 🧠 Pack IA v1 (2026-07-17) — le coach passe au niveau supérieur
+
+Tout repose sur l'existant (Kimi/Moonshot, MediaPipe, guided mode) — aucune nouvelle
+dépendance, zéro secret ajouté, mêmes bornes de coût (`COACH_DAILY_CAP`).
+
+- **⚡ Séances générées directement jouables** — nouveau type `/coach/advise` `session` :
+  le LLM répond en JSON (`response_format: json_object`), **validé et borné côté serveur**
+  (`validateSessionPlan` : 2-4 exercices en liste blanche, séries 1-5, reps 5-60, tenues
+  15-120 s, repos 30-120 s). L'app l'exécute en **mode programme** : enchaînement
+  d'exercices guidés, repos calé sur le plan, bouton « Suivant ▶ » au récap, abandon
+  propre sur arrêt manuel.
+- **🌊 Streaming SSE** — débrief et plan s'écrivent en direct (relay du flux upstream
+  par la Function ; quota décrémenté avant en stream, après succès sinon).
+- **🎭 Personas** — Coach / Sergent / Zen / Nerd (ton injecté côté serveur, enum fermé).
+- **📸 Analyse de posture par photo** — type `posture` vers le modèle vision
+  (`KIMI_VISION_MODEL`, défaut `kimi-latest`). **Le visage est pixelisé SUR L'APPAREIL**
+  (ellipse tête via landmarks MediaPipe → downscale ×12) : jamais de visage envoyé.
+  Image bornée (data URL JPEG/PNG ≤ ~675 Ko), jamais d'URL distante.
+- **📉 VBT (Velocity-Based Training)** — vitesse concentrique par rep calculée sur les
+  keypoints (hanches ; poignets pour la boxe). Perte >20 % vs meilleure rep → faute
+  `fatigue` (cue vocal + faute transmise au coach avec `velDrop%`).
+- **📊 Dispersion de forme** — `formMin/formMax` de la séance partent au coach.
+- **⚖️ ACWR** — ratio charge 7 j/28 j calculé côté client, transmis au plan et au
+  générateur de séance (>150 → séance allégée).
+- **👻 Mode fantôme (local)** — meilleure séance par exercice enregistrée (offsets des
+  reps) et rejouée en direct (`👻 record · toi`) ; battre le fantôme = célébration.
+- **🤸 3 nouveaux exercices** — burpees (machine à états squat→planche→squat), sit-ups
+  (angle du buste), mountain climbers (genoux poitrine alternés, hanches stables).
+  Objectifs hebdo + `REP_MIN_MS` serveur inclus. Seuils initiaux à calibrer via `?cal=1`
+  (même méthode que les pompes).
+- Tests : 34 → **43** (personas, validateSessionPlan, posture/vision, stream, ACWR, VBT).
+
 ## 🩹 Revue 2026-07-17 (audit externe complet)
 
 ### Corrigé

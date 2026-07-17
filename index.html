@@ -172,10 +172,12 @@ window.POW_CONFIG = Object.freeze({
       <div class="counter"><span class="num" id="wk-count">0</span><span class="lbl" id="wk-unit"></span></div>
       <div class="session-sets" id="wk-sets"></div>
       <div class="session-sats" id="session-sats"></div>
+      <div class="ghost-chip" id="ghost-chip" style="display:none"></div>
       <div class="coachmsg" id="coachmsg"></div>
       <div class="wk-actions">
         <button class="btn-stop" id="btn-stop" onclick="stopWorkout()"></button>
         <button class="btn-ghost" id="btn-cam" onclick="flipCamera()"></button>
+        <button class="btn-ghost" id="btn-posture" onclick="postureSnap()" style="display:none">📸</button>
       </div>
     </div>
   </div>
@@ -400,9 +402,25 @@ window.POW_CONFIG = Object.freeze({
 <div class="modal" id="modal-plan">
   <div class="sheet">
     <h2 id="plan-title"></h2>
+    <div class="persona-row"><span id="persona-label"></span><div class="seg" id="persona-seg"></div></div>
     <div class="ai-box"><p id="plan-text" style="white-space:pre-wrap"></p></div>
+    <button class="btn-ghost" id="sess-btn" onclick="genSession()" style="width:100%;margin-top:8px"></button>
+    <div class="sess-card" id="sess-card" style="display:none"></div>
     <div class="wk-actions">
       <button class="btn-ghost" onclick="closeModal('modal-plan')" id="plan-close" style="width:100%"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ANALYSE POSTURE (vision, visage flouté) ============ -->
+<div class="modal" id="modal-posture">
+  <div class="sheet">
+    <h2 id="po-title">📸</h2>
+    <img id="po-img" class="po-img" alt="posture">
+    <p class="po-privacy" id="po-privacy"></p>
+    <div class="ai-box"><p id="po-text" style="white-space:pre-wrap"></p></div>
+    <div class="wk-actions">
+      <button class="btn-ghost" onclick="closeModal('modal-posture')" style="width:100%">✕</button>
     </div>
   </div>
 </div>

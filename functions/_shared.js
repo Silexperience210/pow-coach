@@ -424,6 +424,7 @@ const REP_MIN_MS = {
   squat: 800, jsquat: 650, lunge: 850, knee: 550, jacks: 380,
   pushup: 900, plank: 950, bridge: 850, crunch: 700,
   jab: 230, punch2: 230, warrior: 950, tree: 950,
+  burpee: 2200, situp: 1400, climber: 500, // exos IA pack v1 (seuils initiaux, calibrables)
   run: 20000, // 1 tick = 100 m ; <20 s/100 m (>18 km/h soutenu) = véhicule/GPS → rejeté
 };
 export function repMinMs(exId) { return REP_MIN_MS[exId] || 600; }
@@ -434,6 +435,7 @@ export function repMinMs(exId) { return REP_MIN_MS[exId] || 600; }
 const WEEKLY_GOALS = {
   squat: 100, pushup: 60, lunge: 60, plank: 300, warrior: 120, tree: 120,
   bridge: 80, jacks: 150, jsquat: 60, jab: 300, knee: 100, punch2: 300,
+  burpee: 40, situp: 60, climber: 80,
   run: 200,
 };
 export function weeklyGoal(exId) { return WEEKLY_GOALS[exId] || 0; }

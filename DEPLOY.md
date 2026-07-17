@@ -50,6 +50,7 @@ Cloudflare redéploie **automatiquement à chaque `git push`**, avec previews pa
 | `COMBO_TIERS` | Plaintext | défaut `10:2,21:3` — paliers de combo serveur, **alignés sur `POW_CONFIG`** (`index.html`) ; format `palier:sats,palier:sats` |
 | `KIMI_API_KEY` | **Encrypt 🔒** | clé API Moonshot/Kimi — active le **coach IA** (facultatif) |
 | `KIMI_MODEL` | Plaintext | défaut `kimi-k2.6` — rien à mettre si c'est le modèle voulu |
+| `KIMI_VISION_MODEL` | Plaintext | défaut `kimi-latest` — modèle vision pour la photo posture (facultatif) |
 | `COACH_DAILY_CAP` | Plaintext | `15` (appels coach IA/jour/compte) |
 
 ## KV (obligatoire — auth, budgets, cap/IP)

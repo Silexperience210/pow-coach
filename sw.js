@@ -4,7 +4,7 @@
    - CDN (fonts, MediaPipe JS/wasm, noble) → stale-while-revalidate
    - API (/claim, /session, /balance, /auth, /faucet) → JAMAIS de cache
    - modèle MediaPipe (~10 Mo, *.task) → non mis en cache (trop lourd) */
-const CACHE = 'powcoach-v8'; // v8 : purge l'ancien cache qui contenait /coach/advise (bug d'exclusion)
+const CACHE = 'powcoach-v9'; // v9 : pack IA (séances générées, streaming, posture, fantôme, VBT)
 const SHELL = ['/', '/index.html', '/app.js', '/app.css', '/manifest.json', '/vendor/qrcode.min.js',
   '/vendor/leaflet.js', '/vendor/leaflet.css', '/vendor/noble-secp256k1.js',
   '/icon-192.png', '/icon-512.png'];
