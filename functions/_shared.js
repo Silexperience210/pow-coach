@@ -208,7 +208,7 @@ export function bolt11AmountMsat(pr) {
 
 /* ---------- LNbits ---------- */
 export async function lnbitsWithdrawLink(env, amount, memo) {
-  const r = await fetch(env.LNBITS_URL.replace(/\/+$/, "") + "/withdraw/api/v1/links", {
+  const r = await tfetch(env.LNBITS_URL.replace(/\/+$/, "") + "/withdraw/api/v1/links", {
     method: "POST",
     headers: { "X-Api-Key": env.LNBITS_ADMIN_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -240,8 +240,8 @@ export async function payToLnAddress(env, lnaddr, amountSats, comment) {
   // sinon un endpoint malveillant renvoie une facture géante et vide le wallet faucet.
   const invMsat = bolt11AmountMsat(inv.pr);
   if (invMsat === null || invMsat !== BigInt(msat)) throw new Error("amount_mismatch");
-  // paie l'invoice depuis le wallet faucet
-  const pay = await fetch(env.LNBITS_URL.replace(/\/+$/, "") + "/api/v1/payments", {
+  // paie l'invoice depuis le wallet faucet (tfetch : un LNbits qui pend ne gèle pas la Function)
+  const pay = await tfetch(env.LNBITS_URL.replace(/\/+$/, "") + "/api/v1/payments", {
     method: "POST",
     headers: { "X-Api-Key": env.LNBITS_ADMIN_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ out: true, bolt11: inv.pr }),
@@ -260,6 +260,17 @@ export async function faucetBalanceSats(env) {
   if (!r.ok) throw new Error("wallet_unreachable");
   const w = await r.json();
   return Math.floor((Number(w.balance) || 0) / 1000);
+}
+
+/* ---------- session utilisateur (KV) ----------
+   Partagé par tous les endpoints (avant : dupliqué dans 5 fichiers, et un
+   JSON.parse non protégé → 500 si la valeur KV était corrompue). */
+export async function getSession(env, token) {
+  if (!token || !env.FAUCET_KV) return null;
+  try {
+    const raw = await env.FAUCET_KV.get("session:" + token);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
 /* ---------- rate-limit best-effort (KV) ----------
@@ -283,7 +294,6 @@ export async function rateLimitKV(env, key, minMs) {
      sous très fort parallélisme).
    Interface unique : reserveBudget() renvoie { ok, error, status, rollback }.
    ========================================================= */
-export function hasLedger(env) { return !!env.LEDGER; }
 function ledgerStub(env) { return env.LEDGER.get(env.LEDGER.idFromName("global")); }
 async function ledgerCall(env, path, payload) {
   const r = await ledgerStub(env).fetch("https://ledger.internal" + path, {
@@ -325,7 +335,11 @@ export async function reserveBudget(env, request, session, amount) {
     const ip = clientIp(request);
     const anonCap = parseInt(env.ANON_DAILY_CAP || env.MAX_CLAIM_SATS || "100", 10);
     if (anonCap > 0) caps.push({ key: `ipspent:${ip}:${today}`, cap: anonCap, label: "anon" });
-    ratelimit = { key: ip, windowSec: 60 };
+    ratelimit = { key: "ip:" + ip, windowSec: 60 };
+  } else {
+    // connecté : anti-rafale — avant, un compte pouvait spammer /claim et marteler
+    // LNbits (création de liens Withdraw en boucle) tant que son solde tenait.
+    ratelimit = { key: "u:" + session.pubkey, windowSec: 10 };
   }
   const noop = async () => {};
 
@@ -354,8 +368,8 @@ async function reserveBudgetKV(env, session, amount, today, caps, ratelimit) {
   const rollback = async () => { for (const f of refunds) await f(); };
   // fréquence par IP (min TTL KV = 60 s) — non remboursée (une tentative reste une tentative)
   if (ratelimit) {
-    const rlKey = `iprate:${ratelimit.key}`;
-    if (await kv.get(rlKey)) return { ok: false, status: 429, error: "Trop de demandes — patiente une minute ⚡" };
+    const rlKey = `rate:${ratelimit.key}`;
+    if (await kv.get(rlKey)) return { ok: false, status: 429, error: "Trop de demandes — patiente quelques secondes ⚡" };
     await kv.put(rlKey, "1", { expirationTtl: Math.max(60, ratelimit.windowSec || 60) });
   }
   for (const c of caps) {
@@ -439,15 +453,22 @@ function parseTiers(env) {
       .filter((p) => p.length === 2 && p.every(Number.isFinite));
     if (t.length) return t;
   }
-  return [[5, 2], [10, 3], [21, 5]];
+  // défaut ALIGNÉ sur le client (POW_CONFIG de index.html : ×10→2 sats, ×21→3 sats).
+  // Avant : [[5,2],[10,3],[21,5]] — le serveur payait ~2× plus que ce que l'UI annonçait.
+  return [[10, 2], [21, 3]];
 }
 
+/* Offset de difficulté client (Facile/Normal/Difficile), signé dans le jeton de
+   séance par /session/start → le serveur applique le MÊME seuil que le client
+   (avant : le serveur ignorait la difficulté → reps "parfaites" affichées mais
+   payées 0 sat en Facile, combos invisibles payés en Difficile). */
+export const DIFF_OFF = { easy: -10, normal: 0, hard: 5 };
 /* Rejoue le journal côté serveur et calcule les sats gagnés.
    Filtre les reps non plausibles (hors fenêtre temporelle, trop rapprochées),
    applique le seuil de perfection + les paliers de combo. */
-export function validateRepLog(env, exId, startTs, now, reps) {
+export function validateRepLog(env, exId, startTs, now, reps, diff) {
   if (!Array.isArray(reps)) return { valid: 0, sats: 0 };
-  const PT = parseInt(env.PERFECT_THRESHOLD || "92", 10);
+  const PT = Math.min(99, Math.max(60, parseInt(env.PERFECT_THRESHOLD || "92", 10) + (DIFF_OFF[diff] || 0)));
   const base = parseInt(env.SATS_PERFECT || "1", 10);
   const tiers = parseTiers(env);
   const min = repMinMs(exId);

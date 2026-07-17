@@ -1,8 +1,10 @@
 /* =========================================================
    PoW Coach v2 — Faucet Edition ⚡ (Silexperience)
    ========================================================= */
-import { PoseLandmarker, FilesetResolver, DrawingUtils } from
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+/* MediaPipe est chargé en IMPORT DYNAMIQUE (loadModel) : si le CDN est bloqué
+   (DNS filtrant, Brave, réseau d'entreprise), seule la caméra est indisponible —
+   avant, l'import statique faisait échouer tout le module → écran blanc total. */
+let MP=null; // { PoseLandmarker, FilesetResolver, DrawingUtils } une fois chargé
 
 const CFG = window.POW_CONFIG;
 
@@ -228,8 +230,8 @@ function fmtDur(ms){ const m=Math.ceil(ms/60000); if(m<60)return m+' min';
   const h=Math.floor(m/60), mm=m%60; return mm?`${h}h${String(mm).padStart(2,'0')}`:`${h}h`; }
 async function refreshBalance(){
   try{
-    const q=S.token?('?token='+encodeURIComponent(S.token)):'';
-    const r=await fetch(API()+'/balance'+q);
+    // token en en-tête (pas en query : les URLs finissent dans les logs/historique)
+    const r=await fetch(API()+'/balance',{headers:S.token?{Authorization:'Bearer '+S.token}:{}});
     const d=await r.json();
     S.serverMode=!!d.server;
     if(S.serverMode && S.token){ S.balance=d.balance||0; store.set('powbalance',S.balance);
@@ -242,7 +244,7 @@ async function startServerSession(exId){
   if(!(S.serverMode&&S.token))return;
   try{
     const r=await fetch(API()+'/session/start',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({exId,token:S.token})});
+      body:JSON.stringify({exId,diff:curDiff(),token:S.token})}); // difficulté signée → même seuil côté serveur
     const d=await r.json(); if(d.sessionId)S.wsToken=d.sessionId;
   }catch(e){}
 }
@@ -308,8 +310,12 @@ window.toggleVoice=()=>{ S.voice=!S.voice; store.set('powvoice',S.voice);
   document.getElementById('btn-voice').textContent=S.voice?'🔊':'🔇';
   if(S.voice) say(L().voice.start,{force:true}); else speechSynthesis.cancel(); };
 
-/* ---------- semaine ISO + plafond journalier ---------- */
-function weekId(){const d=new Date();const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+/* ---------- semaine ISO + plafond journalier ----------
+   Semaine calculée en UTC — identique à isoWeek() du serveur (_shared.js).
+   Avant : calendrier LOCAL → autour de minuit (ex lundi 00h30 à Paris = dimanche
+   22h30 UTC), client et serveur comptaient des semaines différentes (W30 vs W29)
+   et les objectifs hebdo se désynchronisaient de l'affichage. */
+function weekId(){const d=new Date();const t=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));
   const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);
   const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));
   return t.getUTCFullYear()+'-W'+Math.ceil((((t-y0)/864e5)+1)/7);}
@@ -604,9 +610,10 @@ function openSport(sp){
    ========================================================= */
 async function loadModel(){
   if(S.landmarker)return;
-  const fs=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  if(!MP) MP=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14");
+  const fs=await MP.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
   // modèle "full" = bien plus précis que "lite" sur les articulations
-  S.landmarker=await PoseLandmarker.createFromOptions(fs,{
+  S.landmarker=await MP.PoseLandmarker.createFromOptions(fs,{
     baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",delegate:"GPU"},
     runningMode:"VIDEO",numPoses:1,
     minPoseDetectionConfidence:0.6, minPosePresenceConfidence:0.6, minTrackingConfidence:0.6});
@@ -630,7 +637,7 @@ async function startCamera(){
   const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.facing,width:{ideal:1280},height:{ideal:720}},audio:false});
   v.srcObject=stream;await v.play();
   const c=$('overlay');c.width=v.videoWidth;c.height=v.videoHeight;
-  S.ctx=c.getContext('2d');S.drawer=new DrawingUtils(S.ctx);
+  S.ctx=c.getContext('2d');S.drawer=MP?new MP.DrawingUtils(S.ctx):null;
   const mir=S.facing==='user'?'scaleX(-1)':'none';
   v.style.transform=mir;c.style.transform=mir;
 }
@@ -858,9 +865,10 @@ function phaseAlign(P,now){
   }
 }
 function drawSkeleton(P,alpha){
+  if(!S.drawer||!MP)return; // modèle non chargé (CDN bloqué) → pas de squelette, mais pas de crash
   const c=getComputedStyle(document.body);
   S.ctx.save();S.ctx.globalAlpha=alpha||1;S.ctx.shadowColor=c.getPropertyValue('--acc');S.ctx.shadowBlur=12;
-  S.drawer.drawConnectors(P,PoseLandmarker.POSE_CONNECTIONS,{color:c.getPropertyValue('--acc').trim(),lineWidth:4});
+  S.drawer.drawConnectors(P,MP.PoseLandmarker.POSE_CONNECTIONS,{color:c.getPropertyValue('--acc').trim(),lineWidth:4});
   S.drawer.drawLandmarks(P,{color:c.getPropertyValue('--acc2').trim(),radius:4});
   S.ctx.restore();
 }
@@ -1616,7 +1624,10 @@ window.openAccount=()=>{
 };
 window.saveAccount=()=>{ S.lnaddr=$('acc-lnaddr').value.trim(); store.set('powlnaddr',S.lnaddr);
   closeModal('modal-account');toast(L().saved);updateAccountBadge(); };
-window.logout=()=>{ S.token='';S.pubkey='';store.set('powtoken','');store.set('powpubkey','');
+window.logout=()=>{ const oldTok=S.token; S.token='';S.pubkey='';store.set('powtoken','');store.set('powpubkey','');
+  // invalide AUSSI la session côté serveur (sinon elle reste valide 30 j en KV)
+  if(oldTok)fetch(API()+'/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:oldTok})}).catch(()=>{});
   if(S.serverMode){S.balance=0;store.set('powbalance',0);renderHome();} // solde serveur lié au compte
   closeModal('modal-account');updateAccountBadge();toast(L().accLogout); };
 function updateAccountBadge(){ $('btn-account').textContent=S.token?'✅':'👤'; }
@@ -2062,12 +2073,17 @@ window.createChallenge=()=>{
   renderChallenges();toast(T.chalCreated);
 };
 window.deleteChallenge=(i)=>{ S.challenges.splice(i,1);store.set('powchallenges',S.challenges);renderChallenges(); };
+/* base64 UTF-8 safe — btoa() jette InvalidCharacterError sur tout caractère
+   > U+00FF (ex l'emoji 🔥 de « Toutes disciplines ») : le partage d'un défi
+   "toutes disciplines" était silencieusement cassé (throw avant le try/catch). */
+const b64enc=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const b64dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
 window.shareChallenge=async(i)=>{
   const T=L(),c=S.challenges[i];
   const ex=c.ex==='any'?null:findEx(c.ex);
   const exName=c.ex==='any'?T.chalAny:(ex?ex.name[S.lang]:c.ex);
   // lien de défi (paramètres dans le hash — l'app les lit au chargement)
-  const link=location.origin+location.pathname+'#chal='+encodeURIComponent(btoa(JSON.stringify({e:c.ex,t:c.target,n:exName})));
+  const link=location.origin+location.pathname+'#chal='+encodeURIComponent(b64enc(JSON.stringify({e:c.ex,t:c.target,n:exName})));
   // image générée
   const blob=await challengeImage(exName,c.target,T);
   try{
@@ -2119,7 +2135,7 @@ async function challengeImage(exName,target,T){
 function importChallengeFromHash(){
   const m=location.hash.match(/chal=([^&]+)/);
   if(!m)return;
-  try{ const d=JSON.parse(atob(decodeURIComponent(m[1])));
+  try{ const d=JSON.parse(b64dec(decodeURIComponent(m[1])));
     // valide strictement : exercice connu (ou "any") + objectif entier borné
     const known = d.e==='any' || !!findEx(d.e);
     const tgt = parseInt(d.t,10);

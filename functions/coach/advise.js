@@ -14,19 +14,13 @@
      KIMI_URL      (Plaintext)   défaut https://api.moonshot.ai/v1
      KIMI_MODEL    (Plaintext)   id du modèle (ex : celui de ton dashboard Kimi)
      COACH_DAILY_CAP (Plaintext) défaut 15 (appels/jour/compte) */
-import { json, preflight, originOk, rateLimitKV, clientIp, tfetch } from "../_shared.js";
+import { json, preflight, originOk, getSession, rateLimitKV, clientIp, tfetch } from "../_shared.js";
 import { buildMessages, llmChat } from "../_coach.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
 
 export async function onRequestGet({ env }) {
   return json({ enabled: !!env.KIMI_API_KEY }, 200, env);
-}
-
-async function getSession(env, token) {
-  if (!token || !env.FAUCET_KV) return null;
-  const raw = await env.FAUCET_KV.get("session:" + token);
-  return raw ? JSON.parse(raw) : null;
 }
 
 export async function onRequestPost({ request, env }) {
@@ -42,13 +36,13 @@ export async function onRequestPost({ request, env }) {
   const session = await getSession(env, body.token);
   if (!session) return json({ error: "auth_required" }, 401, env);
 
-  // plafond quotidien par compte (coût API borné)
+  // plafond quotidien par compte (coût API borné) — vérifié AVANT l'appel mais
+  // décrémenté seulement APRÈS succès : un LLM injoignable ne consomme pas le quota.
   const cap = parseInt(env.COACH_DAILY_CAP || "15", 10);
   const day = new Date().toISOString().slice(0, 10);
   const ck = `coach:${session.pubkey}:${day}`;
   const used = parseInt((await env.FAUCET_KV.get(ck)) || "0", 10);
   if (used >= cap) return json({ error: "Quota coach du jour atteint — à demain 🧠" }, 429, env);
-  await env.FAUCET_KV.put(ck, String(used + 1), { expirationTtl: 172800 });
 
   const type = body.type === "plan" ? "plan" : "debrief";
   const messages = buildMessages(type, body.lang, body.data);
@@ -58,6 +52,7 @@ export async function onRequestPost({ request, env }) {
     // le timeout est choisi par llmChat selon le mode (25 s, ou 110 s en mode raisonnement)
     const text = await llmChat(env, messages, type === "plan" ? 500 : 300,
       (url, opts, ms) => tfetch(url, opts, ms));
+    await env.FAUCET_KV.put(ck, String(used + 1), { expirationTtl: 172800 });
     return json({ text, type }, 200, env);
   } catch (e) {
     return json({ error: "Coach injoignable — réessaie dans un instant" }, 502, env);

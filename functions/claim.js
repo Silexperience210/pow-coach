@@ -19,15 +19,9 @@
      FAUCET_KV  (KV)              → sessions + auth + plafonds best-effort
      LEDGER     (Durable Object)  → plafonds STRICTS/atomiques (optionnel ;
                                     voir ledger-worker/). Si présent, prime sur KV. */
-import { json, preflight, originOk, lnbitsWithdrawLink, payToLnAddress, reserveBudget, ledgerDebit, ledgerRefundBalance, faucetBalanceSats } from "./_shared.js";
+import { json, preflight, originOk, getSession, lnbitsWithdrawLink, payToLnAddress, reserveBudget, ledgerDebit, ledgerRefundBalance, faucetBalanceSats } from "./_shared.js";
 
 export async function onRequestOptions({ env }) { return preflight(env); }
-
-async function getSession(env, token) {
-  if (!token || !env.FAUCET_KV) return null;
-  const raw = await env.FAUCET_KV.get("session:" + token);
-  return raw ? JSON.parse(raw) : null;
-}
 
 export async function onRequestPost({ request, env }) {
   // défense en profondeur : refuse les origines étrangères (le CORS ne bloque pas curl)

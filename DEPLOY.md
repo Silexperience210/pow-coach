@@ -47,6 +47,7 @@ Cloudflare redéploie **automatiquement à chaque `git push`**, avec previews pa
 | `USER_DAILY_CAP` | Plaintext | `200` (cap/jour par compte connecté) |
 | `ANON_DAILY_CAP` | Plaintext | `100` (cap/jour **par IP** sans login ; défaut = `MAX_CLAIM_SATS`) |
 | `REQUIRE_AUTH` | Plaintext | `0` (ou `1` pour forcer la connexion) |
+| `COMBO_TIERS` | Plaintext | défaut `10:2,21:3` — paliers de combo serveur, **alignés sur `POW_CONFIG`** (`index.html`) ; format `palier:sats,palier:sats` |
 | `KIMI_API_KEY` | **Encrypt 🔒** | clé API Moonshot/Kimi — active le **coach IA** (facultatif) |
 | `KIMI_MODEL` | Plaintext | défaut `kimi-k2.6` — rien à mettre si c'est le modèle voulu |
 | `COACH_DAILY_CAP` | Plaintext | `15` (appels coach IA/jour/compte) |

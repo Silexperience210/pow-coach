@@ -1,5 +1,46 @@
 # 🔧 PoW Coach — correctifs sécurité & bugs
 
+## 🩹 Revue 2026-07-17 (audit externe complet)
+
+### Corrigé
+1. **Partage de défi « 🔥 Toutes disciplines » cassé** — `app.js` : `btoa()` jetait
+   `InvalidCharacterError` sur l'emoji (avant le try/catch → échec silencieux).
+   Encodage base64 UTF-8 safe (`b64enc`/`b64dec`), rétrocompatible avec les anciens liens.
+2. **`GET /coach/advise` mis en cache par le service worker** — `sw.js` : la regex
+   d'exclusion API omettait `coach` → `{enabled:false}` restait caché pour toujours
+   (le coach IA activé plus tard restait invisible). `coach` ajouté + cache bumpé `v8`.
+3. **Paliers de combo serveur ≠ client** — `_shared.js` : défaut `[[5,2],[10,3],[21,5]]`
+   → le serveur payait ~2× plus que l'affichage (×10→2, ×21→3). Défaut aligné
+   `[[10,2],[21,3]]` + variable `COMBO_TIERS` enfin documentée (README + DEPLOY).
+4. **Difficulté (Facile/Difficile) ignorée par le scoring serveur** — le seuil
+   « parfait » client (82/92/97) n'était pas appliqué au recalcul (92 fixe) : reps
+   « parfaites » affichées mais payées 0 sat en Facile. La difficulté est désormais
+   **signée dans le jeton de séance** (`/session/start`) et appliquée dans `validateRepLog`.
+5. **Écran blanc total si le CDN MediaPipe est bloqué** — `app.js` : l'import
+   statique tuait tout le module. Passage en **import dynamique** (`loadModel`) :
+   sans CDN, seule la caméra est indisponible, le reste de l'app fonctionne.
+6. **Semaine ISO client ≠ serveur autour de minuit** — `app.js` : le client utilisait
+   le calendrier local, le serveur UTC (dimanche 22h30 UTC = lundi 00h30 à Paris
+   → W30 client / W29 serveur). Le client calcule désormais en UTC comme le serveur.
+7. **Appels LNbits sans timeout** — `_shared.js` : `lnbitsWithdrawLink` et le paiement
+   `/api/v1/payments` utilisent `fetch` brut → un LNbits qui pend gelait la Function.
+   Ils passent par `tfetch()` (8 s) comme le reste.
+8. **Aucun rate-limit `/claim` pour les comptes connectés** — `_shared.js` : un
+   compte pouvait spammer la création de liens Withdraw. Anti-rafale 10 s/compte.
+9. **« Déconnexion » n'invalide pas la session serveur** — nouveau endpoint
+   `POST /auth/logout` (suppression de `session:<token>` en KV), appelé par `logout()`.
+
+### Durcissement / hygiène
+- **Quota coach décrémenté après succès LLM** (un échec réseau ne consomme plus de crédit).
+- **Token `/balance` en en-tête `Authorization: Bearer`** (la query string fuyait
+  dans les logs/historique ; l'ancien paramètre reste accepté pour compat).
+- **`getSession()` mutualisé** dans `_shared.js` (était dupliqué ×5) + `JSON.parse`
+  protégé (une valeur KV corrompue ne renvoie plus de 500) — `poll.js` inclus.
+- **`_headers`** : `Cache-Control: no-cache` aussi pour `/` et `/index.html`.
+- Retrait de `hasLedger()` (export inutilisé). Clé de rate-limit KV renommée `rate:*`.
+- Tests : attentes de combos alignées sur les nouveaux paliers + couverture de la
+  difficulté signée (easy/hard). **Toujours 32/32 → 34/34.**
+
 ## 🚀 Revue 2026-07 (branche `claude/repo-review-suggestions`)
 
 ### Corrigé
