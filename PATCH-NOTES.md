@@ -1,5 +1,20 @@
 # 🔧 PoW Coach — correctifs sécurité & bugs
 
+## 💰 Récompenses : fin des pertes silencieuses (2026-07-17, suite à retour terrain)
+
+Un utilisateur fait 10 pompes → 0 sat, sans aucune explication. Causes traitées :
+
+- **Non connecté + scoring serveur actif = 0 sat garanti, sans avertissement** →
+  toast explicite au démarrage de la séance (`warnNoAuth`).
+- **App fermée avant l'appui sur Stop** (ou réseau KO) → journal perdu, 0 sat →
+  le journal est **persisté pendant la séance** (toutes les 5 reps + `pagehide`)
+  et **re-soumis automatiquement au prochain lancement** (`recoverPending`).
+- **Échec de `/session/start`** (token expiré, réseau) → silence → toast.
+- **Le récap affichait l'estimation locale, pas la vérité du serveur** → après la
+  réponse du serveur, le récap est corrigé avec le montant **réellement crédité**
+  + toast `valid/total` reps validées + toast honnête si **0 sat crédité**
+  (forme sous le seuil — la cause n°1 des « rewards manquants » sur les pompes).
+
 ## 🧠 Pack IA v1 (2026-07-17) — le coach passe au niveau supérieur
 
 Tout repose sur l'existant (Kimi/Moonshot, MediaPipe, guided mode) — aucune nouvelle

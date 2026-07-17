@@ -16,6 +16,11 @@ fr:{ sub:"Proof of Workout — ta sueur vaut des sats. La caméra analyse tes ge
   langTitle:"🌐 Langue du coach", later:"Plus tard", createW:"Créer le retrait", creating:"Création…",
   pcTitle:"⚡ Réclamer tes sats", pcText:(n)=>`Solde gagné : <b style="color:var(--acc2)">${n} sats</b>. Choisis comment recevoir :`,
   claimSub:"Scanne avec n'importe quel wallet Lightning", copy:"Copier LNURL", close:"Fermer", copied:"LNURL copié ✔", copyFail:"Copie impossible", credited:"validés", loginToEarn:"⚡ Connecte-toi (bouton 👤) pour gagner des sats",
+  warnNoAuth:"⚠️ Connecte-toi (👤) AVANT la séance pour gagner des sats — sinon elle ne sera pas rémunérée",
+  submitZero:"0 sat crédité — aucune rep parfaite validée par le serveur (forme ≥ seuil requis)",
+  submitValid:(v,n)=>`${v}/${n} reps validées par le serveur`,
+  submitRetry:"⚠️ Envoi impossible — la séance sera revalidée au prochain lancement",
+  recovered:(n)=>`💾 Séance interrompue récupérée (${n} reps) — validation…`,
   account:"👤 Mon compte", accOutText:"Connecte-toi avec ton wallet Lightning (LNURL-auth) pour sauvegarder ta progression et retirer tes sats sur plusieurs appareils. Aucun email, aucun mot de passe — juste ta signature.", accLogin:"Se connecter", accLoggedTitle:"👤 Mon compte", accLnaddrLabel:"Adresse Lightning (pour recevoir)", accLogout:"Déconnexion", accSave:"Enregistrer", saved:"Enregistré ✔", loginTitle:"⚡ Connexion Lightning", loginSub:"Scanne avec ton wallet compatible LNURL-auth (Phoenix, Zeus, Breez…)", loginWaiting:"En attente de la signature du wallet…", loginOpen:"📲 Ouvrir dans mon wallet", loginOk:"Connecté ✔", loginExpired:"Challenge expiré, réessaie", loginCancel:"Annuler", cancel:"Annuler", close:"Fermer", mLnaddr:"⚡ Adresse Lightning", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Ton adresse Lightning", lnaddrHint:"Paiement automatique et instantané vers cette adresse (ex : nom@walletofsatoshi.com).", lnurlNote:"Un bon de retrait LNURL sera généré : scanne le QR avec n'importe quel wallet.", payDo:"Recevoir", paidOk:(n)=>`⚡ ${n} sats envoyés !`, paidSub:"Vérifie ton wallet Lightning", authRequired:"Connecte-toi d'abord pour retirer", noLnaddr:"Entre ton adresse Lightning",
   tabTrain:"🏋️ Entraîner", tabStats:"📊 Stats", tabBoard:"🏆 Classement", tabChallenge:"🎯 Défis",
   statReps:"reps au total", statStreak:"jours de suite", statSats:"sats gagnés", statPerfect:"parfaits",
@@ -89,6 +94,11 @@ en:{ sub:"Proof of Workout — your sweat earns sats. The camera analyzes your f
   langTitle:"🌐 Coach language", later:"Later", createW:"Create withdrawal", creating:"Creating…",
   pcTitle:"⚡ Claim your sats", pcText:(n)=>`Earned balance: <b style="color:var(--acc2)">${n} sats</b>. Choose how to receive:`,
   claimSub:"Scan with any Lightning wallet", copy:"Copy LNURL", close:"Close", copied:"LNURL copied ✔", copyFail:"Copy failed", credited:"credited", loginToEarn:"⚡ Sign in (👤 button) to earn sats",
+  warnNoAuth:"⚠️ Sign in (👤) BEFORE the session to earn sats — otherwise it won't be rewarded",
+  submitZero:"0 sats credited — no perfect rep validated by the server (form ≥ threshold required)",
+  submitValid:(v,n)=>`${v}/${n} reps validated by the server`,
+  submitRetry:"⚠️ Upload failed — the session will be revalidated on next launch",
+  recovered:(n)=>`💾 Interrupted session recovered (${n} reps) — validating…`,
   account:"👤 My account", accOutText:"Sign in with your Lightning wallet (LNURL-auth) to save your progress and withdraw across devices. No email, no password — just your signature.", accLogin:"Sign in", accLoggedTitle:"👤 My account", accLnaddrLabel:"Lightning Address (to receive)", accLogout:"Log out", accSave:"Save", saved:"Saved ✔", loginTitle:"⚡ Lightning login", loginSub:"Scan with your LNURL-auth wallet (Phoenix, Zeus, Breez…)", loginWaiting:"Waiting for wallet signature…", loginOpen:"📲 Open in my wallet", loginOk:"Connected ✔", loginExpired:"Challenge expired, try again", loginCancel:"Cancel", cancel:"Cancel", close:"Close", mLnaddr:"⚡ Lightning Address", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Your Lightning Address", lnaddrHint:"Automatic instant payment to this address (e.g. name@walletofsatoshi.com).", lnurlNote:"An LNURL withdrawal voucher will be generated: scan the QR with any wallet.", payDo:"Receive", paidOk:(n)=>`⚡ ${n} sats sent!`, paidSub:"Check your Lightning wallet", authRequired:"Sign in first to withdraw", noLnaddr:"Enter your Lightning Address",
   tabTrain:"🏋️ Train", tabStats:"📊 Stats", tabBoard:"🏆 Ranking", tabChallenge:"🎯 Challenges",
   statReps:"total reps", statStreak:"day streak", statSats:"sats earned", statPerfect:"perfect",
@@ -162,6 +172,11 @@ es:{ sub:"Proof of Workout — tu sudor vale sats. La cámara analiza tus gestos
   langTitle:"🌐 Idioma del coach", later:"Más tarde", createW:"Crear retiro", creating:"Creando…",
   pcTitle:"⚡ Reclama tus sats", pcText:(n)=>`Saldo ganado: <b style="color:var(--acc2)">${n} sats</b>. Elige cómo recibir:`,
   claimSub:"Escanea con cualquier wallet Lightning", copy:"Copiar LNURL", close:"Cerrar", copied:"LNURL copiado ✔", copyFail:"No se pudo copiar", credited:"validados", loginToEarn:"⚡ Inicia sesión (botón 👤) para ganar sats",
+  warnNoAuth:"⚠️ Inicia sesión (👤) ANTES de la sesión para ganar sats — si no, no será recompensada",
+  submitZero:"0 sats acreditados — ninguna rep perfecta validada por el servidor (forma ≥ umbral requerido)",
+  submitValid:(v,n)=>`${v}/${n} reps validadas por el servidor`,
+  submitRetry:"⚠️ Envío imposible — la sesión se revalidará en el próximo inicio",
+  recovered:(n)=>`💾 Sesión interrumpida recuperada (${n} reps) — validando…`,
   account:"👤 Mi cuenta", accOutText:"Inicia sesión con tu wallet Lightning (LNURL-auth) para guardar tu progreso y retirar en varios dispositivos. Sin email, sin contraseña — solo tu firma.", accLogin:"Iniciar sesión", accLoggedTitle:"👤 Mi cuenta", accLnaddrLabel:"Dirección Lightning (para recibir)", accLogout:"Cerrar sesión", accSave:"Guardar", saved:"Guardado ✔", loginTitle:"⚡ Acceso Lightning", loginSub:"Escanea con tu wallet LNURL-auth (Phoenix, Zeus, Breez…)", loginWaiting:"Esperando la firma del wallet…", loginOpen:"📲 Abrir en mi wallet", loginOk:"Conectado ✔", loginExpired:"Challenge expirado, reintenta", loginCancel:"Cancelar", cancel:"Cancelar", close:"Cerrar", mLnaddr:"⚡ Dirección Lightning", mLnurl:"📷 QR / LNURL", lnaddrLabel:"Tu dirección Lightning", lnaddrHint:"Pago automático e instantáneo a esta dirección (ej: nombre@walletofsatoshi.com).", lnurlNote:"Se generará un vale de retiro LNURL: escanea el QR con cualquier wallet.", payDo:"Recibir", paidOk:(n)=>`⚡ ¡${n} sats enviados!`, paidSub:"Revisa tu wallet Lightning", authRequired:"Inicia sesión para retirar", noLnaddr:"Introduce tu dirección Lightning",
   tabTrain:"🏋️ Entrenar", tabStats:"📊 Stats", tabBoard:"🏆 Ranking", tabChallenge:"🎯 Retos",
   statReps:"reps totales", statStreak:"días seguidos", statSats:"sats ganados", statPerfect:"perfectos",
@@ -283,23 +298,75 @@ async function startServerSession(exId){
   try{
     const r=await fetch(API()+'/session/start',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({exId,diff:curDiff(),token:S.token})}); // difficulté signée → même seuil côté serveur
-    const d=await r.json(); if(d.sessionId)S.wsToken=d.sessionId;
-  }catch(e){}
+    const d=await r.json();
+    if(d.sessionId)S.wsToken=d.sessionId;
+    else toast('⚠️ '+(d.error||'session serveur refusée — reconnecte-toi')); // avant : silence → 0 sat
+  }catch(e){ toast('⚠️ '+L().submitRetry); }
 }
 // fin de séance : envoie le journal, le serveur recalcule et crédite le solde
+/* ---- journal de séance : persistance locale + récupération ----
+   Avant : fermer l'app (ou un réseau KO) avant l'appui sur Stop = journal perdu,
+   0 sat, silence total. Maintenant le journal est persisté pendant la séance,
+   re-soumis au prochain lancement, et le serveur dit la VÉRITÉ (reps validées,
+   sats crédités) affichée dans le récap. */
+function persistPending(){
+  if(!S.wsToken||!S.repLog.length)return;
+  store.set('powpending',{sessionId:S.wsToken,exId:S.ex?S.ex.id:'',reps:S.repLog.slice(0,5000),t:Date.now()});
+}
+function clearPending(){ store.set('powpending',null); }
+async function postSubmit(sessionId,reps){
+  const r=await fetch(API()+'/session/submit',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({sessionId,reps,token:S.token})});
+  return await r.json();
+}
+function applySubmitResult(d){
+  if(typeof d.balance==='number'){S.balance=d.balance;store.set('powbalance',S.balance);renderHome();}
+  if(typeof d.lockUntil==='number')S.lockUntil=d.lockUntil;
+}
 async function submitServerSession(){
   const tok=S.wsToken,log=S.repLog;S.wsToken=null;S.repLog=[];
-  if(!tok||!log.length)return;
+  if(!tok||!log.length)return null;
+  const T=L();let d;
+  try{ d=await postSubmit(tok,log); }
+  catch(e){
+    // réseau KO → journal conservé, re-soumis au prochain lancement de l'app
+    store.set('powpending',{sessionId:tok,exId:S.ex?S.ex.id:'',reps:log.slice(0,5000),t:Date.now()});
+    toast(T.submitRetry); return null;
+  }
+  applySubmitResult(d);
+  if(d.error){ toast(d.error); return d; }
+  clearPending();
+  if(d.credited>0)toast('+'+d.credited+' ⚡ '+(T.credited||'validés'));
+  else toast(T.submitZero); // le serveur a validé 0 rep → le dire, honnêtement
+  if(typeof d.valid==='number'&&d.valid<log.length)toast(T.submitValid(d.valid,log.length));
+  if(d.bonus>0)toast('🏆 +'+d.bonus+' ⚡'); // bonus hebdo crédité par le serveur
+  if(d.locked&&earnLockLeft()>0)toast(T.capLock(fmtDur(earnLockLeft()))); // plafond atteint → cooldown
+  return d;
+}
+/* Au démarrage : une séance interrompue (app fermée avant Stop, crash, réseau)
+   est re-soumise automatiquement — sats retrouvés, pas de perte silencieuse. */
+async function recoverPending(){
+  const p=store.get('powpending',null);
+  if(!p||!p.sessionId||!Array.isArray(p.reps)||!p.reps.length)return;
+  if(!S.token){ return; } // on réessaiera à la prochaine connexion
+  if(Date.now()-p.t>3*3600*1000){ clearPending(); return; } // >3h : le serveur la refuse de toute façon
+  toast(L().recovered(p.reps.length));
   try{
-    const r=await fetch(API()+'/session/submit',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sessionId:tok,reps:log,token:S.token})});
-    const d=await r.json();
-    if(typeof d.balance==='number'){S.balance=d.balance;store.set('powbalance',S.balance);renderHome();}
-    if(typeof d.lockUntil==='number')S.lockUntil=d.lockUntil;
-    if(d.credited>0)toast('+'+d.credited+' ⚡ '+(L().credited||'validés'));
-    if(d.bonus>0)toast('🏆 +'+d.bonus+' ⚡'); // bonus hebdo crédité par le serveur
-    if(d.locked&&earnLockLeft()>0)toast(L().capLock(fmtDur(earnLockLeft()))); // plafond atteint → cooldown
-  }catch(e){}
+    const d=await postSubmit(p.sessionId,p.reps);
+    if(d.error){ clearPending(); return; } // déjà validée ou expirée → on oublie
+    applySubmitResult(d);clearPending();
+    if(d.credited>0)toast('💾 +'+d.credited+' ⚡ '+(L().credited||'validés'));
+    if(d.bonus>0)toast('🏆 +'+d.bonus+' ⚡');
+  }catch(e){ /* réseau toujours KO → on garde pour la prochaine fois */ }
+}
+/* Le récap affiche d'abord l'estimation locale, puis est corrigé par la vérité
+   du serveur (montant réellement crédité + reps validées). */
+function updateRecapCredits(d,total){
+  const el=$('ws-sats'); if(!el)return;
+  if(typeof d.credited==='number'){
+    el.textContent='⚡'+d.credited;
+    el.title=L().submitValid(typeof d.valid==='number'?d.valid:total,total);
+  }
 }
 // relays testés à l'écriture (kind 30078). bitcoiner.social retiré : ne répond
 // plus aux EVENT (timeout systématique constaté), remplacé par offchain.pub.
@@ -884,6 +951,9 @@ async function startWorkout(exId, progStep){
   ensureWeek();ensureDay();
   // cooldown : plafond de sats atteint → aucune séance rémunérée avant expiration
   if(S.serverMode && S.token && earnLockLeft()>0){ toast(L().capLock(fmtDur(earnLockLeft()))); return; }
+  // avertissement crucial : scoring serveur actif MAIS pas connecté → 0 sat assuré.
+  // Avant : aucune indication, l'utilisateur s'entraînait pour rien.
+  if(S.serverMode&&!S.token){ toast(L().warnNoAuth); }
   S.ex=findEx(exId);S.engine=S.ex.make();S.combo=0;S.comboTier=0;S.sessionSats=0;
   S.phase='align';S.countdown=0;smoothLM=null;S.alignHold=0;S.cdStarted=false;
   // stats de séance (récap + coach) et mode guidé (séries × reps avec repos auto)
@@ -1125,6 +1195,7 @@ function onScore(form){
   S.repForms.push(Math.round(form));
   if(S.ghostRec.length<2000)S.ghostRec.push(nowT-S.sessionStart); // trace fantôme
   if(S.ex.unit!=='sec'){ const drop=vbtOnRep(nowT); if(drop)addFault('fatigue'); } // VBT
+  if(S.sessionReps%5===0)persistPending(); // journal sauvegardé → récupération si l'app se ferme
 
   if(perfect){
     S.combo++;
@@ -1202,8 +1273,10 @@ window.stopWorkout=()=>{S.running=false;S.phase='align';S.cdStarted=false;speech
   // arrêt MANUEL en plein programme IA (pas une fin de série guidée) → on l'abandonne
   if(S.program&&!(S.guided&&S.guided.done))S.program=null;
   const sum=finishSummary();                       // récap + ajustement de la cible
-  submitServerSession();goHome();
-  if(sum)showWorkoutSummary(sum);};
+  const subP=submitServerSession();goHome();
+  if(sum){ showWorkoutSummary(sum);
+    if(subP)subP.then(d=>{ if(d)updateRecapCredits(d,sum.reps); }); // vérité serveur dans le récap
+  }};
 
 /* =========================================================
    COACH — progression adaptative, séances guidées, récap, IA
@@ -2471,5 +2544,8 @@ function importChallengeFromHash(){
 
 /* ---------- init ---------- */
 ensureWeek();ensureDay();ensureStats();applyLangStatic();renderHome();updateAccountBadge();importChallengeFromHash();refreshBalance();checkFaucet();renderDiff();renderGuided();checkCoach();
+// journal de séance : sauvegarde à la fermeture + récupération au lancement
+window.addEventListener('pagehide',()=>{ persistPending(); });
+setTimeout(()=>{ recoverPending(); },1500); // laisse refreshBalance définir serverMode d'abord
 if(!store.get('powlang-set',false)){store.set('powlang-set',true);$('modal-lang').classList.add('show');} // 1re visite : langue d'abord, l'intro suivra (setLang)
 else maybeIntro();
